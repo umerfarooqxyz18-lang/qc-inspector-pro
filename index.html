@@ -7,13 +7,6 @@
 
 <!-- Supabase JS (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-
-<!--
-  ╔══════════════════════════════════════════════╗
-  ║  CONFIGURATION — edit frontend/config.js     ║
-  ║  Set your Supabase URL, anon key, API URL    ║
-  ╚══════════════════════════════════════════════╝
--->
 <script src="config.js"></script>
 
 <style>
@@ -735,6 +728,35 @@ td.bold{color:var(--text);font-weight:500}
 <script src="lib/api.js"></script>
 <script src="lib/auth.js"></script>
 <script>
+// Wait for all scripts to load before booting
+document.addEventListener('DOMContentLoaded', function() {
+  // Small delay to ensure authClient is initialized
+  setTimeout(function() {
+    (async () => {
+      if (typeof authClient === 'undefined') {
+        console.error('authClient not loaded');
+        showAuthPage();
+        return;
+      }
+      try {
+        const session = await authClient.getSession();
+        if (session) {
+          api.setToken(session.access_token);
+          window.currentUser = session.user;
+          hideAuthPage();
+          await initApp();
+        } else {
+          showAuthPage();
+        }
+      } catch(e) {
+        console.error('Boot error:', e);
+        showAuthPage();
+      }
+    })();
+  }, 100);
+});
+</script>
+<script>
 // ════════════════════════════════════════════════════════
 // APP STATE
 // ════════════════════════════════════════════════════════
@@ -1342,19 +1364,8 @@ function formatDate(d) {
 }
 
 // ════════════════════════════════════════════════════════
-// BOOT — check existing session
+// BOOT — handled by DOMContentLoaded below
 // ════════════════════════════════════════════════════════
-(async () => {
-  const session = await authClient.getSession();
-  if (session) {
-    api.setToken(session.access_token);
-    window.currentUser = session.user;
-    hideAuthPage();
-    await initApp();
-  } else {
-    showAuthPage();
-  }
-})();
 </script>
 </body>
 </html>
