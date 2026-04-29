@@ -1,1 +1,1360 @@
-Test Backend
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI QC Inspector Pro</title>
+
+<!-- Supabase JS (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<!--
+  ╔══════════════════════════════════════════════╗
+  ║  CONFIGURATION — edit frontend/config.js     ║
+  ║  Set your Supabase URL, anon key, API URL    ║
+  ╚══════════════════════════════════════════════╝
+-->
+<script src="config.js"></script>
+
+<style>
+/* ── Reset & Design Tokens ──────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--bg2:#161820;--bg3:#1e2028;--bg4:#252730;
+  --border:#2a2d3a;--border2:#353848;
+  --text:#e8eaf0;--text2:#9ca3b8;--text3:#6b7290;
+  --accent:#4f7ef8;--accent2:#3b6ae0;--accent-glow:rgba(79,126,248,.15);
+  --green:#22c55e;--red:#ef4444;--amber:#f59e0b;--purple:#a855f7;
+  --radius:10px;--radius2:14px;--sidebar:240px;
+  --shadow:0 2px 16px rgba(0,0,0,.45);
+}
+[data-theme="light"]{
+  --bg:#f4f5f8;--bg2:#ffffff;--bg3:#eef0f5;--bg4:#e8eaf0;
+  --border:#dde0ea;--border2:#c8ccd8;
+  --text:#0f1117;--text2:#4a5068;--text3:#7b82a0;
+  --shadow:0 2px 12px rgba(0,0,0,.08);
+}
+html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.5;background:var(--bg);color:var(--text)}
+
+/* ── AUTH SCREEN ────────────────────────────────────────── */
+#auth-screen{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center}
+#auth-screen.hidden{display:none}
+.auth-card{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:40px;width:420px;max-width:95vw}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;justify-content:center}
+.auth-logo-icon{width:42px;height:42px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center}
+.auth-logo-icon svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.auth-logo-text{font-size:18px;font-weight:700;color:var(--text)}
+.auth-tabs{display:flex;background:var(--bg3);border-radius:10px;padding:4px;gap:4px;margin-bottom:24px}
+.auth-tab{flex:1;padding:8px;border-radius:7px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--text3);font-family:inherit;transition:all .15s}
+.auth-tab.active{background:var(--bg2);color:var(--text);box-shadow:var(--shadow)}
+.auth-form{display:flex;flex-direction:column;gap:14px}
+.auth-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+.auth-sub{font-size:12px;color:var(--text3);margin-bottom:8px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+label{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.03em}
+.form-control{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);font-family:inherit;transition:border-color .15s;outline:none;width:100%}
+.form-control:focus{border-color:var(--accent);background:var(--bg2)}
+select.form-control option{background:var(--bg2);color:var(--text)}
+.auth-error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:10px 12px;border-radius:8px;font-size:12px;display:none}
+.auth-error.show{display:block}
+
+/* ── MAIN APP ───────────────────────────────────────────── */
+#app{display:flex;height:100vh;overflow:hidden;position:relative}
+#app.hidden{display:none}
+
+/* ── SIDEBAR ────────────────────────────────────────────── */
+.sidebar{width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-header{padding:18px 14px 14px;border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-icon svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.logo-text{font-size:13px;font-weight:700;color:var(--text)}
+.logo-sub{font-size:10px;color:var(--text3)}
+nav{flex:1;padding:10px 8px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.nav-section{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;padding:10px 8px 4px;margin-top:4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .15s;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--accent-glow);color:var(--accent);border:1px solid rgba(79,126,248,.2)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:20px;min-width:18px;text-align:center}
+.sidebar-footer{padding:10px 8px;border-top:1px solid var(--border)}
+.user-card{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius);cursor:pointer;transition:background .15s}
+.user-card:hover{background:var(--bg3)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#4f7ef8,#a855f7);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.user-name{font-size:12px;font-weight:600;color:var(--text)}
+.user-role{font-size:10px;color:var(--text3)}
+
+/* ── MAIN AREA ──────────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;padding:13px 24px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.topbar-title{font-size:15px;font-weight:700;color:var(--text);flex:1}
+
+/* ── BUTTONS ────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;font-family:inherit}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent2)}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover:not(:disabled){background:var(--bg4);color:var(--text)}
+.btn-danger{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.theme-btn{background:var(--bg3);border:1px solid var(--border);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);transition:all .15s;font-size:15px}
+
+/* ── CONTENT & PAGES ────────────────────────────────────── */
+.content{flex:1;overflow-y:auto;padding:24px}
+.page{display:none;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.page-header{margin-bottom:22px}
+.page-header h1{font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px}
+.page-header p{font-size:13px;color:var(--text3)}
+
+/* ── GRIDS & CARDS ──────────────────────────────────────── */
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:18px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:20px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:18px 20px}
+.stat-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.stat-value{font-size:28px;font-weight:700;color:var(--text);line-height:1}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:6px}
+.stat-up{color:var(--green)}.stat-down{color:var(--red)}
+.card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-link{font-size:11px;font-weight:500;color:var(--accent);cursor:pointer;background:none;border:none;font-family:inherit}
+
+/* ── BADGES ─────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.badge-open{background:rgba(239,68,68,.12);color:#ef4444}
+.badge-progress{background:rgba(245,158,11,.12);color:#f59e0b}
+.badge-closed{background:rgba(34,197,94,.12);color:#22c55e}
+.badge-critical{background:rgba(239,68,68,.12);color:#ef4444}
+.badge-major{background:rgba(245,158,11,.12);color:#f59e0b}
+.badge-minor{background:rgba(34,197,94,.12);color:#22c55e}
+.badge-observation{background:rgba(156,163,184,.12);color:#9ca3b8}
+.badge-info{background:rgba(79,126,248,.12);color:#4f7ef8}
+
+/* ── ISSUE ROWS ─────────────────────────────────────────── */
+.issue-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:all .15s}
+.issue-row:last-child{border-bottom:none}
+.issue-row:hover{background:var(--bg3);padding:11px 10px;margin:0 -10px;border-radius:8px}
+.sev-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sev-critical{background:var(--red)}.sev-major{background:var(--amber)}.sev-minor{background:var(--green)}.sev-observation{background:var(--text3)}
+.issue-title{font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.issue-meta{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* ── FORMS ──────────────────────────────────────────────── */
+.form-section{margin-bottom:26px}
+.form-section-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.form-row{display:grid;gap:14px;margin-bottom:14px}
+.form-row-2{grid-template-columns:1fr 1fr}
+.form-row-3{grid-template-columns:1fr 1fr 1fr}
+textarea.form-control{resize:vertical;min-height:90px;line-height:1.5}
+
+/* ── SEVERITY SELECTOR ──────────────────────────────────── */
+.severity-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+.sev-btn{padding:9px 8px;border-radius:8px;border:2px solid var(--border);background:var(--bg3);cursor:pointer;font-size:11px;font-weight:700;color:var(--text2);text-align:center;transition:all .15s;font-family:inherit}
+.sev-btn.sel-critical{border-color:#ef4444;background:rgba(239,68,68,.12);color:#ef4444}
+.sev-btn.sel-major{border-color:#f59e0b;background:rgba(245,158,11,.12);color:#f59e0b}
+.sev-btn.sel-minor{border-color:#22c55e;background:rgba(34,197,94,.12);color:#22c55e}
+.sev-btn.sel-observation{border-color:var(--text3);background:rgba(156,163,184,.1);color:var(--text2)}
+
+/* ── UPLOAD ZONE ────────────────────────────────────────── */
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--radius);padding:28px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-glow)}
+.upload-zone p{font-size:12px;color:var(--text3);margin-top:6px}
+.img-preview-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:flex-start}
+.img-thumb{width:72px;height:72px;border-radius:8px;object-fit:cover;border:2px solid var(--border);cursor:pointer;transition:border-color .15s}
+.img-thumb:hover{border-color:var(--accent)}
+.img-upload-loading{display:inline-block;width:72px;height:72px;border-radius:8px;background:var(--bg4);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3)}
+
+/* ── AI PANEL ───────────────────────────────────────────── */
+.ai-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:20px;margin-top:18px}
+.ai-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.ai-icon{width:30px;height:30px;background:linear-gradient(135deg,#4f7ef8,#a855f7);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ai-icon svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ai-title{font-size:13px;font-weight:700;color:var(--text)}
+.ai-sub{font-size:11px;color:var(--text3)}
+.ai-output{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;color:var(--text2);line-height:1.8;min-height:80px;max-height:380px;overflow-y:auto;white-space:pre-line;font-family:'Courier New',monospace}
+
+/* ── STEPS ──────────────────────────────────────────────── */
+.step-indicator{display:flex;align-items:center;margin-bottom:22px}
+.step-wrap{display:flex;align-items:center;gap:8px}
+.step-num{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0;transition:all .2s}
+.step-num.done{background:var(--green);border-color:var(--green);color:#fff}
+.step-num.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.step-name{font-size:11px;font-weight:500;color:var(--text3);transition:color .2s}
+.step-name.active{color:var(--text);font-weight:600}
+.step-line{width:36px;height:2px;background:var(--border);margin:0 6px;transition:background .3s}
+.step-line.done{background:var(--green)}
+
+/* ── DONUT CHART ────────────────────────────────────────── */
+.donut-wrap{position:relative;width:120px;height:120px;flex-shrink:0}
+.donut-wrap svg{transform:rotate(-90deg)}
+.donut-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--text);line-height:1}
+.donut-label small{font-size:10px;font-weight:400;color:var(--text3);margin-top:2px}
+.bar-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+
+/* ── TABLE ──────────────────────────────────────────────── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:700;color:var(--text3);text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+td.bold{color:var(--text);font-weight:500}
+
+/* ── ACTIVITY ───────────────────────────────────────────── */
+.activity-item{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.act-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:5px;flex-shrink:0}
+.act-text{font-size:12px;color:var(--text2);flex:1;line-height:1.5}
+.act-time{font-size:11px;color:var(--text3);white-space:nowrap}
+
+/* ── LOADING SPINNER ────────────────────────────────────── */
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.skeleton{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px;height:16px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── TOAST ──────────────────────────────────────────────── */
+.toast{position:fixed;bottom:24px;right:24px;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;box-shadow:0 4px 20px rgba(0,0,0,.3);max-width:360px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-success{background:var(--green);color:#fff}
+.toast-error{background:var(--red);color:#fff}
+.toast-info{background:var(--accent);color:#fff}
+
+/* ── MODAL ──────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:28px;width:500px;max-width:95vw;max-height:85vh;overflow-y:auto;transform:translateY(10px);transition:transform .2s}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--text3);margin-bottom:20px}
+
+/* ── EMPTY STATE ────────────────────────────────────────── */
+.empty-state{text-align:center;padding:48px 20px;color:var(--text3)}
+.empty-state-icon{font-size:40px;margin-bottom:12px}
+.empty-state h3{font-size:15px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.empty-state p{font-size:12px}
+
+/* ── KEYWORD HIGHLIGHT ──────────────────────────────────── */
+.kw-critical{color:var(--red);font-weight:700}
+.kw-major{color:var(--amber);font-weight:600}
+
+/* ── PLAN CARDS ─────────────────────────────────────────── */
+.plan-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:24px;position:relative}
+.plan-card.featured{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.plan-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:3px 12px;border-radius:20px;white-space:nowrap}
+.plan-name{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+.plan-price{font-size:30px;font-weight:800;color:var(--text);margin:10px 0 4px}
+.plan-price span{font-size:13px;font-weight:400;color:var(--text3)}
+.plan-desc{font-size:12px;color:var(--text3);margin-bottom:16px}
+.plan-feature{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text2);padding:5px 0}
+.plan-feature svg{width:14px;height:14px;fill:none;stroke:var(--green);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;margin-top:1px}
+.plan-feature.no svg{stroke:var(--text3)}
+.plan-feature.no{color:var(--text3)}
+
+@media(max-width:768px){
+  .sidebar{width:56px}
+  .logo-text,.logo-sub,.nav-section,.user-name,.user-role{display:none}
+  .nav-item span:not(.nav-badge){display:none}
+  .nav-item{justify-content:center;padding:10px}
+  .grid-4{grid-template-columns:1fr 1fr}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .form-row-2,.form-row-3{grid-template-columns:1fr}
+}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body data-theme="">
+
+<!-- ════════════════════════════════════════════════════════
+     AUTH SCREEN
+════════════════════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      </div>
+      <div class="auth-logo-text">AI QC Inspector Pro</div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup')">Create Account</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="auth-login">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-sub">Sign in to your QC workspace</div>
+      <div class="auth-error" id="login-error"></div>
+      <div class="auth-form">
+        <div class="form-group"><label>Email Address</label><input class="form-control" type="email" id="login-email" placeholder="you@company.com" autocomplete="email"/></div>
+        <div class="form-group"><label>Password</label><input class="form-control" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" id="login-btn" onclick="handleLogin()">Sign In</button>
+        <p style="font-size:11px;color:var(--text3);text-align:center">Demo: <strong>demo@qcinspector.io</strong> / <strong>demo1234</strong></p>
+      </div>
+    </div>
+
+    <!-- SIGNUP -->
+    <div id="auth-signup" style="display:none">
+      <div class="auth-title">Create your account</div>
+      <div class="auth-sub">Start your free QC inspection workspace</div>
+      <div class="auth-error" id="signup-error"></div>
+      <div class="auth-form">
+        <div class="form-row form-row-2">
+          <div class="form-group"><label>Full Name</label><input class="form-control" type="text" id="signup-name" placeholder="Ahmed Al-Khalid"/></div>
+          <div class="form-group"><label>Role</label>
+            <select class="form-control" id="signup-role">
+              <option value="inspector">QC Inspector</option>
+              <option value="admin">Admin / Manager</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Email Address</label><input class="form-control" type="email" id="signup-email" placeholder="you@company.com"/></div>
+        <div class="form-group"><label>Password (min 8 characters)</label><input class="form-control" type="password" id="signup-pass" placeholder="••••••••"/></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" id="signup-btn" onclick="handleSignup()">Create Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MAIN APP
+════════════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+      <div><div class="logo-text">QC Inspector Pro</div><div class="logo-sub">AI-Powered Platform</div></div>
+    </div>
+  </div>
+  <nav>
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span>Dashboard</span>
+    </button>
+    <div class="nav-section">Inspection</div>
+    <button class="nav-item" onclick="showPage('inspect',this)">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>New Inspection</span>
+    </button>
+    <button class="nav-item" onclick="showPage('reports',this)">
+      <svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span>AI Reports</span>
+    </button>
+    <div class="nav-section">Tracking</div>
+    <button class="nav-item" onclick="showPage('issues',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>Issue Tracker</span><span class="nav-badge" id="open-badge">—</span>
+    </button>
+    <div class="nav-section">System</div>
+    <button class="nav-item" onclick="showPage('pricing',this)">
+      <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span>Plans & Billing</span>
+    </button>
+    <button class="nav-item" onclick="showPage('settings',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Settings</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-card" onclick="showPage('settings')">
+      <div class="avatar" id="user-avatar">?</div>
+      <div><div class="user-name" id="user-name">Loading...</div><div class="user-role" id="user-role">—</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbar-title">Dashboard</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn btn-ghost" onclick="showPage('inspect')">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Inspection
+      </button>
+      <button class="theme-btn" onclick="toggleTheme()">☀️</button>
+      <button class="btn btn-ghost" onclick="authClient.signOut()" style="font-size:11px">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ════ DASHBOARD ════ -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1 id="dash-greeting">Good morning 👋</h1>
+        <p id="dash-sub">Loading your QC workspace...</p>
+      </div>
+      <div class="grid-4">
+        <div class="stat-card"><div class="stat-label">Total Inspections</div><div class="stat-value" id="stat-total">—</div><div class="stat-sub">All time</div></div>
+        <div class="stat-card"><div class="stat-label">Open Issues</div><div class="stat-value" id="stat-open" style="color:var(--red)">—</div><div class="stat-sub" id="stat-overdue-text"></div></div>
+        <div class="stat-card"><div class="stat-label">Closed Issues</div><div class="stat-value" id="stat-closed" style="color:var(--green)">—</div><div class="stat-sub">Resolved NCRs</div></div>
+        <div class="stat-card"><div class="stat-label">Compliance Score</div><div class="stat-value" id="stat-compliance" style="color:var(--accent)">—</div><div class="stat-sub">Inspection closure rate</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Severity Distribution <button class="card-link" onclick="showPage('issues')">View all →</button></div>
+          <div style="display:flex;gap:20px;align-items:center">
+            <div class="donut-wrap">
+              <svg width="120" height="120" viewBox="0 0 120 120" id="donut-svg">
+                <circle cx="60" cy="60" r="48" fill="none" stroke="var(--bg3)" stroke-width="16"/>
+              </svg>
+              <div class="donut-label" id="donut-label">—<small>total</small></div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:11px" id="severity-bars">
+              <div style="display:flex;align-items:center;gap:7px"><div class="skeleton" style="width:160px"></div></div>
+              <div style="display:flex;align-items:center;gap:7px"><div class="skeleton" style="width:140px"></div></div>
+              <div style="display:flex;align-items:center;gap:7px"><div class="skeleton" style="width:120px"></div></div>
+              <div style="display:flex;align-items:center;gap:7px"><div class="skeleton" style="width:100px"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Monthly Inspections <span style="font-size:11px;color:var(--text3)">6 months</span></div>
+          <div id="monthly-chart" style="display:flex;gap:8px;align-items:flex-end;height:110px;padding-top:20px">
+            <div style="color:var(--text3);font-size:12px;align-self:center">Loading...</div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Recent Inspections <button class="card-link" onclick="showPage('reports')">View all →</button></div>
+          <div id="recent-inspections"><div class="skeleton" style="height:20px;margin-bottom:10px"></div><div class="skeleton" style="height:20px;margin-bottom:10px"></div><div class="skeleton" style="height:20px"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Team Workload</div>
+          <div id="team-workload"><div class="skeleton" style="height:20px;margin-bottom:10px"></div><div class="skeleton" style="height:20px;margin-bottom:10px"></div><div class="skeleton" style="height:20px"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ NEW INSPECTION ════ -->
+    <div class="page" id="page-inspect">
+      <div class="page-header"><h1>New Inspection</h1><p>Complete all sections to save to database and generate AI report</p></div>
+      <div class="step-indicator">
+        <div class="step-wrap"><div class="step-num active" id="s1">1</div><div class="step-name active" id="sn1">Site Details</div></div>
+        <div class="step-line" id="sl1"></div>
+        <div class="step-wrap"><div class="step-num" id="s2">2</div><div class="step-name" id="sn2">Inspection Data</div></div>
+        <div class="step-line" id="sl2"></div>
+        <div class="step-wrap"><div class="step-num" id="s3">3</div><div class="step-name" id="sn3">AI Report</div></div>
+      </div>
+
+      <!-- Step 1: Site Details -->
+      <div id="sc1">
+        <div class="card">
+          <div class="form-section">
+            <div class="form-section-title">Project Information</div>
+            <div class="form-row form-row-2">
+              <div class="form-group"><label>Project Name *</label><input class="form-control" id="f-project-name" placeholder="e.g. Al-Jubail Refinery Expansion"/></div>
+              <div class="form-group"><label>Contractor / Subcontractor</label><input class="form-control" id="f-contractor" placeholder="e.g. Al-Rashid Steel Works Co."/></div>
+            </div>
+            <div class="form-row form-row-3">
+              <div class="form-group"><label>Inspection Type *</label>
+                <select class="form-control" id="f-type">
+                  <option>Welding / NDT</option><option>Structural Steel</option><option>Concrete Works</option>
+                  <option>Pipeline / Piping</option><option>Coating & Painting</option>
+                  <option>Electrical</option><option>Mechanical Equipment</option><option>Civil / Foundation</option>
+                  <option>Pressure Testing</option><option>Fire Protection</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Zone / Area</label><input class="form-control" id="f-zone" placeholder="e.g. Zone 3 / Block C"/></div>
+              <div class="form-group"><label>Inspection Date *</label><input class="form-control" type="date" id="f-date"/></div>
+            </div>
+            <div class="form-row form-row-2">
+              <div class="form-group"><label>Inspector Name *</label><input class="form-control" id="f-inspector" placeholder="Full name"/></div>
+              <div class="form-group"><label>Assign To</label>
+                <select class="form-control" id="f-assign"><option value="">Select team member...</option></select>
+              </div>
+            </div>
+          </div>
+          <div class="form-section">
+            <div class="form-section-title">Environmental Conditions</div>
+            <div class="form-row form-row-3">
+              <div class="form-group"><label>Temperature (°C)</label><input class="form-control" type="number" id="f-temp" placeholder="38"/></div>
+              <div class="form-group"><label>Humidity (%)</label><input class="form-control" type="number" id="f-humidity" placeholder="65"/></div>
+              <div class="form-group"><label>Weather</label>
+                <select class="form-control" id="f-weather">
+                  <option>Clear / Sunny</option><option>Partly Cloudy</option><option>Overcast</option><option>Windy</option><option>Dusty / Sandstorm</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <button class="btn btn-primary" onclick="goStep(2)">Continue →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Inspection Data -->
+      <div id="sc2" style="display:none">
+        <div class="card">
+          <div class="form-section">
+            <div class="form-section-title">Defect / Finding Details</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Observation / Finding Description *</label>
+                <textarea class="form-control" id="f-findings" rows="5" placeholder="Describe the finding in detail..." oninput="highlightKeywords(this)"></textarea>
+                <div id="findings-highlighted" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+              </div>
+            </div>
+            <div class="form-row form-row-2">
+              <div class="form-group"><label>Reference Standard</label>
+                <select class="form-control" id="f-standard">
+                  <option>ASME B31.3 — Process Piping</option><option>AWS D1.1 — Structural Welding</option>
+                  <option>API 650 — Storage Tanks</option><option>SAES-W-011 — Welding (Aramco)</option>
+                  <option>ISO 3834 — Welding Quality</option><option>ACI 318 — Concrete</option>
+                  <option>ASTM A36 — Structural Steel</option><option>NACE SP0169 — Coating</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Inspection Method</label>
+                <select class="form-control" id="f-method">
+                  <option>Visual Inspection (VT)</option><option>Ultrasonic Testing (UT)</option>
+                  <option>Radiographic Testing (RT)</option><option>Magnetic Particle (MT)</option>
+                  <option>Dye Penetrant (PT)</option><option>Dimensional Check</option><option>Hardness Testing (HT)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label style="display:flex;align-items:center;justify-content:space-between">
+                Severity Level
+                <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="aiSuggestSeverity()" id="sev-ai-btn">🤖 AI Suggest</button>
+              </label>
+              <div class="severity-grid">
+                <div class="sev-btn" onclick="setSev(this,'critical')" id="sb-critical">🔴 Critical</div>
+                <div class="sev-btn sel-major" onclick="setSev(this,'major')" id="sb-major">🟡 Major</div>
+                <div class="sev-btn" onclick="setSev(this,'minor')" id="sb-minor">🟢 Minor</div>
+                <div class="sev-btn" onclick="setSev(this,'observation')" id="sb-obs">⚪ Observation</div>
+              </div>
+              <div id="sev-ai-reason" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+            </div>
+            <div class="form-row form-row-2" style="margin-top:14px">
+              <div class="form-group"><label>NCR Required?</label>
+                <select class="form-control" id="f-ncr">
+                  <option>Yes — Raise NCR</option><option>No — Observation Only</option><option>Pending Engineering Review</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Due Date</label><input class="form-control" type="date" id="f-due"/></div>
+            </div>
+          </div>
+          <div class="form-section">
+            <div class="form-section-title">Photo Evidence</div>
+            <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleDrop(event)">
+              <div style="font-size:32px;margin-bottom:8px">📸</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text2)">Click or drag photos here</div>
+              <p>JPEG, PNG, HEIC — up to 20MB each · Multiple files</p>
+              <div id="img-previews" class="img-preview-grid"></div>
+            </div>
+            <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="handleFileSelect(this.files)"/>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <button class="btn btn-ghost" onclick="goStep(1)">← Back</button>
+            <button class="btn btn-primary" id="save-btn" onclick="saveInspection()">
+              <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save & Generate AI Report →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: AI Report -->
+      <div id="sc3" style="display:none">
+        <div class="ai-panel">
+          <div class="ai-header">
+            <div class="ai-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></div>
+            <div style="flex:1"><div class="ai-title">AI-Generated NCR Report</div><div class="ai-sub" id="ai-sub-text">Powered by Claude — professional engineering language</div></div>
+            <button class="btn btn-ghost" id="regen-btn" onclick="generateAIReport()">↻ Regenerate</button>
+          </div>
+          <div class="ai-output" id="ai-out">Report will appear here after saving the inspection...</div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-title">Export & Actions</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="pdf-btn" onclick="downloadPDF()">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download PDF
+            </button>
+            <button class="btn btn-ghost" onclick="toast('NCR created and added to tracker','success');showPage('issues')">⚠️ Raise NCR</button>
+            <button class="btn btn-ghost" onclick="toast('Inspection saved','success');showPage('reports')">View in Reports</button>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:12px">
+          <button class="btn btn-ghost" onclick="goStep(2)">← Back</button>
+          <button class="btn btn-primary" onclick="showPage('issues');toast('Issue tracked successfully','success')">Save & Track Issue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ AI REPORTS ════ -->
+    <div class="page" id="page-reports">
+      <div class="page-header"><h1>AI Report Library</h1><p>All inspections — searchable, filterable, exportable</p></div>
+      <div class="card">
+        <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+          <input class="form-control" style="flex:1;min-width:180px;max-width:300px" placeholder="Search inspections..." type="search" id="report-search" oninput="filterReports()"/>
+          <select class="form-control" style="width:150px" id="report-filter-type" onchange="filterReports()">
+            <option value="">All Types</option>
+            <option>Welding / NDT</option><option>Structural Steel</option><option>Concrete Works</option>
+            <option>Pipeline / Piping</option><option>Coating & Painting</option>
+          </select>
+          <select class="form-control" style="width:140px" id="report-filter-sev" onchange="filterReports()">
+            <option value="">All Severity</option>
+            <option value="critical">Critical</option><option value="major">Major</option>
+            <option value="minor">Minor</option><option value="observation">Observation</option>
+          </select>
+          <button class="btn btn-primary" onclick="showPage('inspect')">+ New</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Zone</th><th>Severity</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+            <tbody id="reports-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);padding:30px">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ ISSUE TRACKER ════ -->
+    <div class="page" id="page-issues">
+      <div class="page-header"><h1>Issue Tracker (NCR)</h1><p>Track, assign and resolve non-conformances</p></div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+        <select class="form-control" style="width:150px" id="issue-filter" onchange="loadIssues()">
+          <option value="">All Issues</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In Progress</option>
+          <option value="closed">Closed</option>
+        </select>
+        <select class="form-control" style="width:140px" id="issue-sev-filter" onchange="loadIssues()">
+          <option value="">All Severity</option>
+          <option value="critical">Critical</option>
+          <option value="major">Major</option>
+          <option value="minor">Minor</option>
+        </select>
+        <button class="btn btn-primary" style="margin-left:auto" onclick="showPage('inspect')">+ New Inspection</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="padding-left:20px">NCR #</th><th>Issue</th><th>Severity</th>
+              <th>Assigned</th><th>Zone</th><th>Status</th><th>Due</th><th style="padding-right:20px">Action</th>
+            </tr></thead>
+            <tbody id="issues-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);padding:30px">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ PRICING ════ -->
+    <div class="page" id="page-pricing">
+      <div class="page-header"><h1>Plans & Billing</h1><p>Choose the plan that fits your project scale</p></div>
+      <div class="grid-3">
+        <div class="plan-card">
+          <div class="plan-name">Free</div>
+          <div class="plan-price">$0 <span>/ month</span></div>
+          <div class="plan-desc">For solo inspectors and trial</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> 5 inspections / month</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Basic AI report</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> 10 issues max</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> PDF export</div>
+          <div class="plan-feature no"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Team collaboration</div>
+          <div class="plan-feature no"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Aramco / SAES standards</div>
+          <button class="btn btn-ghost" style="width:100%;margin-top:16px;justify-content:center">Current Plan</button>
+        </div>
+        <div class="plan-card featured">
+          <div class="plan-badge">⭐ Most Popular</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price">$79 <span>/ user / month</span></div>
+          <div class="plan-desc">For professional QC teams on site</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Unlimited inspections</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Full AI NCR generation (Claude)</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Unlimited issue tracking</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Up to 5 team members</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> SAES / Aramco standards</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Image upload & PDF export</div>
+          <button class="btn btn-primary" style="width:100%;margin-top:16px;justify-content:center" onclick="toast('Redirecting to Stripe...','info')">Upgrade to Pro →</button>
+        </div>
+        <div class="plan-card">
+          <div class="plan-name">Enterprise</div>
+          <div class="plan-price">$399 <span>/ month</span></div>
+          <div class="plan-desc">For Aramco, EPC firms & megaprojects</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Everything in Pro</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Unlimited team members</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Custom AI on your standards</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> REST API access</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> SSO / LDAP</div>
+          <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Dedicated account manager</div>
+          <button class="btn btn-ghost" style="width:100%;margin-top:16px;justify-content:center" onclick="toast('Sales team will contact you within 24h','info')">Contact Sales →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SETTINGS ════ -->
+    <div class="page" id="page-settings">
+      <div class="page-header"><h1>Settings</h1><p>Profile and platform preferences</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Profile</div>
+          <div class="form-group" style="margin-bottom:12px"><label>Full Name</label><input class="form-control" id="set-name"/></div>
+          <div class="form-group" style="margin-bottom:12px"><label>Company / Project</label><input class="form-control" id="set-company"/></div>
+          <div class="form-group" style="margin-bottom:12px"><label>Position / Role</label><input class="form-control" id="set-position"/></div>
+          <div class="form-group" style="margin-bottom:16px"><label>Phone</label><input class="form-control" id="set-phone" type="tel"/></div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+        </div>
+        <div class="card">
+          <div class="card-title">AI Preferences</div>
+          <div class="form-group" style="margin-bottom:12px"><label>Report Language</label>
+            <select class="form-control"><option>English</option><option>Arabic (العربية)</option><option>Bilingual EN / AR</option></select>
+          </div>
+          <div class="form-group" style="margin-bottom:12px"><label>Default Standard</label>
+            <select class="form-control"><option>ASME B31.3</option><option>AWS D1.1</option><option>SAES-W-011 (Aramco)</option><option>API 650</option></select>
+          </div>
+          <div class="form-group" style="margin-bottom:12px"><label>AI Tone</label>
+            <select class="form-control"><option>Formal Engineering</option><option>Technical Summary</option><option>Executive Brief</option></select>
+          </div>
+          <div class="form-group" style="margin-bottom:16px"><label>Auto-raise NCR for</label>
+            <select class="form-control"><option>Critical only</option><option>Critical & Major</option><option>All findings</option></select>
+          </div>
+          <button class="btn btn-primary" onclick="toast('AI settings saved','success')">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- TOAST -->
+<div class="toast" id="toast-el"></div>
+
+<!-- SCRIPTS -->
+<script src="lib/api.js"></script>
+<script src="lib/auth.js"></script>
+<script>
+// ════════════════════════════════════════════════════════
+// APP STATE
+// ════════════════════════════════════════════════════════
+let currentStep     = 1;
+let selectedSev     = 'major';
+let savedInspection = null;    // populated after DB save
+let uploadedUrls    = [];
+let allInspections  = [];
+let teamMembers     = [];
+let isDark          = true;
+
+// ════════════════════════════════════════════════════════
+// AUTH HANDLERS
+// ════════════════════════════════════════════════════════
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0 && tab==='login')||(i===1 && tab==='signup')));
+  document.getElementById('auth-login').style.display  = tab==='login'  ? 'block' : 'none';
+  document.getElementById('auth-signup').style.display = tab==='signup' ? 'block' : 'none';
+}
+
+async function handleLogin() {
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  err.classList.remove('show');
+  btn.innerHTML = '<span class="spinner"></span> Signing in...';
+  btn.disabled = true;
+  try {
+    await authClient.signIn(
+      document.getElementById('login-email').value,
+      document.getElementById('login-pass').value
+    );
+  } catch(e) {
+    err.textContent = e.message;
+    err.classList.add('show');
+    btn.innerHTML = 'Sign In';
+    btn.disabled = false;
+  }
+}
+
+async function handleSignup() {
+  const btn = document.getElementById('signup-btn');
+  const err = document.getElementById('signup-error');
+  err.classList.remove('show');
+  btn.innerHTML = '<span class="spinner"></span> Creating account...';
+  btn.disabled = true;
+  try {
+    await authClient.signUp(
+      document.getElementById('signup-email').value,
+      document.getElementById('signup-pass').value,
+      document.getElementById('signup-name').value,
+      document.getElementById('signup-role').value
+    );
+    err.style.background = 'rgba(34,197,94,.12)';
+    err.style.borderColor = 'rgba(34,197,94,.3)';
+    err.style.color = '#22c55e';
+    err.textContent = '✓ Account created! Check your email to confirm, then sign in.';
+    err.classList.add('show');
+  } catch(e) {
+    err.textContent = e.message;
+    err.classList.add('show');
+  }
+  btn.innerHTML = 'Create Account';
+  btn.disabled = false;
+}
+
+function showAuthPage() {
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+function hideAuthPage() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+}
+
+// ════════════════════════════════════════════════════════
+// APP INIT (called after successful auth)
+// ════════════════════════════════════════════════════════
+async function initApp() {
+  try {
+    // Load profile
+    const profile = await api.getProfile();
+    const initials = profile.full_name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    document.getElementById('user-avatar').textContent = initials;
+    document.getElementById('user-name').textContent   = profile.full_name;
+    document.getElementById('user-role').textContent   = profile.position || profile.role;
+
+    // Pre-fill inspection form
+    document.getElementById('f-inspector').value = profile.full_name;
+    document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+
+    // Pre-fill settings
+    document.getElementById('set-name').value     = profile.full_name || '';
+    document.getElementById('set-company').value  = profile.company || '';
+    document.getElementById('set-position').value = profile.position || '';
+    document.getElementById('set-phone').value    = profile.phone || '';
+
+    // Greeting
+    const hr = new Date().getHours();
+    const greeting = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('dash-greeting').textContent = `${greeting}, ${profile.full_name.split(' ')[0]} 👋`;
+
+    // Load team for assignments
+    teamMembers = await api.getTeam();
+    const sel = document.getElementById('f-assign');
+    sel.innerHTML = '<option value="">Select team member...</option>';
+    teamMembers.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m.id; o.textContent = m.full_name;
+      sel.appendChild(o);
+    });
+
+    // Load dashboard & reports
+    await loadDashboard();
+    await loadInspections();
+    await loadIssues();
+  } catch(e) {
+    console.error('[INIT]', e);
+    toast('Failed to load workspace: ' + e.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const d = await api.getDashboard();
+
+    // Stats
+    document.getElementById('stat-total').textContent = d.totalInspections;
+    document.getElementById('stat-open').textContent  = d.openIssues;
+    document.getElementById('stat-closed').textContent= d.closedIssues;
+    document.getElementById('stat-compliance').textContent = d.complianceScore + '%';
+    document.getElementById('open-badge').textContent = d.openIssues || '0';
+
+    if (d.overdueIssues > 0) {
+      document.getElementById('stat-overdue-text').innerHTML =
+        `<span class="stat-down">⚠️ ${d.overdueIssues} overdue</span>`;
+    }
+
+    document.getElementById('dash-sub').textContent =
+      `Compliance: ${d.complianceScore}% · ${d.openIssues} open issues · ${d.totalInspections} total inspections`;
+
+    // Donut chart
+    renderDonut(d.severityCount, d.totalInspections);
+
+    // Monthly chart
+    renderMonthlyChart(d.monthly);
+
+    // Recent inspections
+    const recEl = document.getElementById('recent-inspections');
+    if (!d.recentInspections.length) {
+      recEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No inspections yet</h3><p>Create your first inspection</p></div>';
+    } else {
+      recEl.innerHTML = d.recentInspections.map(ins => `
+        <div class="issue-row" onclick="showPage('reports')">
+          <div class="sev-dot sev-${ins.severity}"></div>
+          <div style="flex:1;min-width:0">
+            <div class="issue-title">${ins.inspection_type} — ${ins.zone || 'Site'}</div>
+            <div class="issue-meta">${ins.project_name} · ${formatDate(ins.created_at)}</div>
+          </div>
+          <span class="badge badge-${ins.status.replace('_','-')}">${statusLabel(ins.status)}</span>
+        </div>`).join('');
+    }
+
+    // Team workload
+    const twEl = document.getElementById('team-workload');
+    if (!d.teamWorkload.length) {
+      twEl.innerHTML = '<p style="color:var(--text3);font-size:12px">No open issues assigned</p>';
+    } else {
+      twEl.innerHTML = d.teamWorkload.map(t => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--text2);flex:1">${t.name}</div>
+          <div style="width:80px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+            <div style="height:100%;background:var(--accent);width:${Math.min(100,(t.openCount/5)*100)}%;border-radius:3px"></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--text);min-width:20px;text-align:right">${t.openCount}</div>
+        </div>`).join('');
+    }
+  } catch(e) {
+    console.error('[DASHBOARD]', e);
+  }
+}
+
+function renderDonut(sev, total) {
+  const svg = document.getElementById('donut-svg');
+  document.getElementById('donut-label').innerHTML = `${total}<small>total</small>`;
+  const circ = 2 * Math.PI * 48; // circumference
+  const colors = { critical:'#ef4444', major:'#f59e0b', minor:'#22c55e', observation:'#6b7290' };
+  let offset = 0;
+  let html = `<circle cx="60" cy="60" r="48" fill="none" stroke="var(--bg3)" stroke-width="16"/>`;
+  Object.entries(sev).forEach(([key, val]) => {
+    if (!val || !total) return;
+    const dash = (val / total) * circ;
+    html += `<circle cx="60" cy="60" r="48" fill="none" stroke="${colors[key]}" stroke-width="16" stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-dashoffset="-${offset.toFixed(1)}"/>`;
+    offset += dash;
+  });
+  svg.innerHTML = html;
+
+  const bars = document.getElementById('severity-bars');
+  bars.innerHTML = Object.entries(sev).map(([key, val]) => `
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="sev-dot sev-${key}" style="flex-shrink:0"></div>
+      <span style="font-size:12px;color:var(--text2);width:72px;capitalize">${key}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${total?Math.round((val/total)*100):0}%;background:${['#ef4444','#f59e0b','#22c55e','#6b7290'][['critical','major','minor','observation'].indexOf(key)]}"></div></div>
+      <span style="font-size:12px;font-weight:600;color:var(--text);min-width:22px;text-align:right">${val}</span>
+    </div>`).join('');
+}
+
+function renderMonthlyChart(monthly) {
+  if (!monthly?.length) return;
+  const max = Math.max(...monthly.map(m => m.count), 1);
+  const chartEl = document.getElementById('monthly-chart');
+  chartEl.innerHTML = monthly.map((m, i) => `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <span style="font-size:9px;color:var(--text3)">${m.count}</span>
+      <div style="width:100%;height:${Math.max(4,Math.round((m.count/max)*90))}px;background:${i===monthly.length-1?'var(--purple)':'var(--accent)'};border-radius:4px 4px 0 0;opacity:${i===monthly.length-1?.9:.55};transition:opacity .2s;cursor:pointer" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=${i===monthly.length-1?.9:.55}" title="${m.label}: ${m.count}"></div>
+      <span style="font-size:10px;color:${i===monthly.length-1?'var(--text)':'var(--text3)'}">${m.label}</span>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// INSPECTIONS / REPORTS
+// ════════════════════════════════════════════════════════
+async function loadInspections() {
+  try {
+    const res = await api.getInspections({ limit: 50 });
+    allInspections = res.data || [];
+    renderReportsTable(allInspections);
+  } catch(e) { console.error('[INSPECTIONS]', e); }
+}
+
+function renderReportsTable(data) {
+  const tbody = document.getElementById('reports-tbody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📄</div><h3>No inspections yet</h3><p>Create your first inspection above</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(ins => `
+    <tr>
+      <td style="color:var(--text3);font-size:11px">${ins.inspection_no}</td>
+      <td class="bold">${ins.inspection_type} — ${ins.zone || 'Site'}</td>
+      <td><span class="badge badge-info">${ins.inspection_type.split('/')[0].trim()}</span></td>
+      <td>${ins.zone || '—'}</td>
+      <td><span class="badge badge-${ins.severity}">${capitalize(ins.severity)}</span></td>
+      <td><span class="badge badge-${ins.status.replace('_','-')}">${statusLabel(ins.status)}</span></td>
+      <td style="color:var(--text3);font-size:11px">${formatDate(ins.inspection_date || ins.created_at)}</td>
+      <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="downloadPDFById('${ins.id}','${ins.inspection_no}')">↓ PDF</button></td>
+    </tr>`).join('');
+}
+
+function filterReports() {
+  const search = document.getElementById('report-search').value.toLowerCase();
+  const type   = document.getElementById('report-filter-type').value;
+  const sev    = document.getElementById('report-filter-sev').value;
+  let filtered = allInspections;
+  if (search) filtered = filtered.filter(i => (i.inspection_type+i.zone+i.project_name).toLowerCase().includes(search));
+  if (type)   filtered = filtered.filter(i => i.inspection_type === type);
+  if (sev)    filtered = filtered.filter(i => i.severity === sev);
+  renderReportsTable(filtered);
+}
+
+// ════════════════════════════════════════════════════════
+// ISSUES (NCRs)
+// ════════════════════════════════════════════════════════
+async function loadIssues() {
+  try {
+    const statusFilter = document.getElementById('issue-filter')?.value;
+    const sevFilter    = document.getElementById('issue-sev-filter')?.value;
+    const params = {};
+    if (statusFilter) params.status   = statusFilter;
+    if (sevFilter)    params.severity = sevFilter;
+    const issues = await api.getIssues(params);
+    renderIssuesTable(issues);
+  } catch(e) { console.error('[ISSUES]', e); }
+}
+
+function renderIssuesTable(issues) {
+  const tbody = document.getElementById('issues-tbody');
+  if (!issues.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">✅</div><h3>No issues found</h3><p>All clear — or adjust your filters</p></div></td></tr>`;
+    return;
+  }
+  const today = new Date().toISOString().split('T')[0];
+  tbody.innerHTML = issues.map(i => {
+    const overdue = i.due_date && i.due_date < today && i.status !== 'closed';
+    return `<tr>
+      <td style="color:var(--text3);font-size:11px;padding-left:20px">${i.ncr_no}</td>
+      <td class="bold" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i.title}</td>
+      <td><span class="badge badge-${i.severity}">${capitalize(i.severity)}</span></td>
+      <td style="white-space:nowrap;font-size:12px">${i.assigned_to_name || '—'}</td>
+      <td style="font-size:12px">${i.zone || '—'}</td>
+      <td><span class="badge badge-${i.status.replace('_','-')}">${statusLabel(i.status)}</span></td>
+      <td style="font-size:12px;color:${overdue?'var(--red)':i.status==='closed'?'var(--green)':'var(--text3)'}">${i.due_date ? formatDate(i.due_date) : '—'}${i.status==='closed'?' ✓':overdue?' ⚠️':''}</td>
+      <td style="padding-right:20px">
+        <select style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:3px 6px;font-family:inherit;cursor:pointer" onchange="updateIssueStatus('${i.id}',this.value)">
+          <option value="">Change status</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In Progress</option>
+          <option value="closed">Closed</option>
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function updateIssueStatus(id, status) {
+  if (!status) return;
+  try {
+    await api.updateIssue(id, { status });
+    toast('Issue status updated to: ' + statusLabel(status), 'success');
+    await loadIssues();
+    await loadDashboard();
+  } catch(e) { toast('Update failed: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════════════════
+// INSPECTION FORM
+// ════════════════════════════════════════════════════════
+function goStep(n) { currentStep = n; renderStep(); }
+function renderStep() {
+  [1,2,3].forEach(i => {
+    document.getElementById('sc'+i).style.display = i===currentStep?'block':'none';
+    const snum = document.getElementById('s'+i);
+    snum.className = 'step-num'+(i<currentStep?' done':i===currentStep?' active':'');
+    snum.textContent = i<currentStep?'✓':i;
+    document.getElementById('sn'+i).className = 'step-name'+(i===currentStep?' active':'');
+    if (i<3) document.getElementById('sl'+i).className = 'step-line'+(i<currentStep?' done':'');
+  });
+}
+
+function setSev(el, type) {
+  ['critical','major','minor','observation'].forEach(t => {
+    document.getElementById('sb-'+t.replace('observation','obs')).className = 'sev-btn';
+  });
+  el.className = 'sev-btn sel-'+type;
+  selectedSev = type;
+}
+
+// Keyword highlighting in findings textarea
+const CRITICAL_KW = ['crack','fracture','rupture','collapse','failure','unsafe','leak','corrosion','buckle'];
+const MAJOR_KW    = ['porosity','delamination','inadequate','non-compliant','defect','weld defect','misalignment','out of tolerance'];
+function highlightKeywords(ta) {
+  const val = ta.value.toLowerCase();
+  const found = [];
+  CRITICAL_KW.forEach(k => { if (val.includes(k)) found.push(`<span class="kw-critical">🔴 ${k}</span>`); });
+  MAJOR_KW.forEach(k => { if (val.includes(k)) found.push(`<span class="kw-major">🟡 ${k}</span>`); });
+  document.getElementById('findings-highlighted').innerHTML = found.length
+    ? 'Detected keywords: ' + found.join(' · ')
+    : '';
+}
+
+// AI severity suggestion
+async function aiSuggestSeverity() {
+  const findings = document.getElementById('f-findings').value;
+  if (!findings || findings.length < 10) { toast('Please enter findings first','error'); return; }
+  const btn = document.getElementById('sev-ai-btn');
+  btn.textContent = '⏳ Analyzing...';
+  btn.disabled = true;
+  try {
+    const res = await api.suggestSeverity({ findings, inspection_type: document.getElementById('f-type').value });
+    // Set the suggested severity
+    ['critical','major','minor','observation'].forEach(t => {
+      document.getElementById('sb-'+t.replace('observation','obs')).className = 'sev-btn';
+    });
+    const id = 'sb-' + (res.severity==='observation'?'obs':res.severity);
+    document.getElementById(id).className = 'sev-btn sel-' + res.severity;
+    selectedSev = res.severity;
+    document.getElementById('sev-ai-reason').textContent = '🤖 AI: ' + res.reason;
+    toast('AI suggested: ' + capitalize(res.severity), 'info');
+  } catch(e) { toast('AI suggestion failed: ' + e.message, 'error'); }
+  btn.textContent = '🤖 AI Suggest';
+  btn.disabled = false;
+}
+
+// Image upload handling
+async function handleFileSelect(files) {
+  if (!files.length) return;
+  const previewEl = document.getElementById('img-previews');
+  // Show loading placeholders
+  Array.from(files).forEach(() => {
+    const ph = document.createElement('div');
+    ph.className = 'img-upload-loading';
+    ph.textContent = '⏳';
+    previewEl.appendChild(ph);
+  });
+  try {
+    const res = await api.uploadImages(files);
+    uploadedUrls = [...uploadedUrls, ...res.urls];
+    // Replace placeholders with previews
+    previewEl.innerHTML = uploadedUrls.map(url =>
+      `<img src="${url}" class="img-thumb" title="${url}"/>`
+    ).join('');
+    toast(`${res.count} photo(s) uploaded`, 'success');
+  } catch(e) {
+    // Remove loading placeholders
+    document.querySelectorAll('.img-upload-loading').forEach(el => el.remove());
+    toast('Upload failed: ' + e.message, 'error');
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const files = e.dataTransfer.files;
+  if (files.length) handleFileSelect(files);
+}
+
+// Save inspection to DB
+async function saveInspection() {
+  const findings = document.getElementById('f-findings').value;
+  const projectName = document.getElementById('f-project-name').value;
+  const inspector = document.getElementById('f-inspector').value;
+  const type = document.getElementById('f-type').value;
+
+  if (!projectName || !findings || !inspector) {
+    toast('Please fill in required fields (Project, Inspector, Findings)', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('save-btn');
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+  btn.disabled = true;
+
+  try {
+    const assignSel = document.getElementById('f-assign');
+    const assignId = assignSel.value;
+    const assignName = assignId ? assignSel.options[assignSel.selectedIndex].text : '';
+
+    const inspectionData = {
+      project_name: projectName,
+      inspection_type: type,
+      zone: document.getElementById('f-zone').value,
+      inspection_date: document.getElementById('f-date').value,
+      inspector_name: inspector,
+      contractor: document.getElementById('f-contractor').value,
+      temperature: document.getElementById('f-temp').value || null,
+      humidity: document.getElementById('f-humidity').value || null,
+      weather: document.getElementById('f-weather').value,
+      findings,
+      reference_standard: document.getElementById('f-standard').value,
+      inspection_method: document.getElementById('f-method').value,
+      severity: selectedSev,
+      ncr_required: document.getElementById('f-ncr').value,
+      assigned_to_id: assignId || null,
+      assigned_to_name: assignName,
+      image_urls: uploadedUrls,
+      due_date: document.getElementById('f-due').value || null,
+    };
+
+    savedInspection = await api.createInspection(inspectionData);
+    toast('Inspection ' + savedInspection.inspection_no + ' saved!', 'success');
+
+    // Move to step 3 and generate report
+    goStep(3);
+    await generateAIReport();
+
+    // Refresh dashboard & lists
+    loadDashboard();
+    loadInspections();
+    loadIssues();
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  }
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/></svg> Save & Generate AI Report →`;
+  btn.disabled = false;
+}
+
+// Generate AI report (calls real API)
+async function generateAIReport() {
+  const out = document.getElementById('ai-out');
+  out.textContent = 'Generating professional NCR report via Claude AI...';
+
+  const payload = savedInspection ? {
+    inspection_id:      savedInspection.id,
+    inspection_no:      savedInspection.inspection_no,
+    project_name:       savedInspection.project_name,
+    inspection_type:    savedInspection.inspection_type,
+    zone:               savedInspection.zone,
+    inspection_date:    savedInspection.inspection_date,
+    inspector_name:     savedInspection.inspector_name,
+    contractor:         savedInspection.contractor,
+    temperature:        savedInspection.temperature,
+    humidity:           savedInspection.humidity,
+    findings:           savedInspection.findings,
+    reference_standard: savedInspection.reference_standard,
+    inspection_method:  savedInspection.inspection_method,
+    severity:           savedInspection.severity,
+    assigned_to_name:   savedInspection.assigned_to_name,
+  } : {
+    // Fallback: use current form values
+    project_name:       document.getElementById('f-project-name').value,
+    inspection_type:    document.getElementById('f-type').value,
+    zone:               document.getElementById('f-zone').value,
+    inspector_name:     document.getElementById('f-inspector').value,
+    findings:           document.getElementById('f-findings').value,
+    reference_standard: document.getElementById('f-standard').value,
+    inspection_method:  document.getElementById('f-method').value,
+    severity:           selectedSev,
+  };
+
+  document.getElementById('ai-sub-text').textContent = 'Generating via Claude AI...';
+
+  try {
+    const res = await api.generateReport(payload);
+    // Stream the text character by character for effect
+    out.textContent = '';
+    let i = 0;
+    const txt = res.report;
+    const interval = setInterval(() => {
+      if (i < txt.length) { out.textContent += txt[i++]; out.scrollTop = out.scrollHeight; }
+      else clearInterval(interval);
+    }, 8);
+    document.getElementById('ai-sub-text').textContent = `Report generated · ${res.tokens_used || '—'} tokens used`;
+    toast('AI report generated!', 'success');
+  } catch(e) {
+    out.textContent = 'AI generation failed: ' + e.message + '\n\nCheck your API key and backend connection.';
+    toast('AI failed: ' + e.message, 'error');
+  }
+}
+
+// PDF download
+async function downloadPDF() {
+  if (!savedInspection) { toast('Save inspection first', 'error'); return; }
+  await downloadPDFById(savedInspection.id, savedInspection.inspection_no);
+}
+
+async function downloadPDFById(id, no) {
+  try {
+    toast('Generating PDF...', 'info');
+    await api.downloadPDF(id, `${no}_QC_Report.pdf`);
+    toast('PDF downloaded!', 'success');
+  } catch(e) { toast('PDF failed: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════════
+async function saveProfile() {
+  try {
+    await api.updateProfile({
+      full_name: document.getElementById('set-name').value,
+      company:   document.getElementById('set-company').value,
+      position:  document.getElementById('set-position').value,
+      phone:     document.getElementById('set-phone').value,
+    });
+    toast('Profile saved', 'success');
+  } catch(e) { toast('Save failed: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════
+const pageTitles = {
+  dashboard:'Dashboard',inspect:'New Inspection',reports:'AI Reports',
+  issues:'Issue Tracker',pricing:'Plans & Billing',settings:'Settings'
+};
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id)?.classList.add('active');
+  document.getElementById('topbar-title').textContent = pageTitles[id] || id;
+  if (btn) btn.classList.add('active');
+  else {
+    document.querySelectorAll('.nav-item').forEach(b => {
+      if ((b.getAttribute('onclick')||'').includes("'"+id+"'")) b.classList.add('active');
+    });
+  }
+  if (id==='inspect') { currentStep=1; renderStep(); uploadedUrls=[]; savedInspection=null; document.getElementById('img-previews').innerHTML=''; document.getElementById('ai-out').textContent='Report will appear here...'; }
+  if (id==='reports')   loadInspections();
+  if (id==='issues')    loadIssues();
+  if (id==='dashboard') loadDashboard();
+}
+
+// ════════════════════════════════════════════════════════
+// THEME
+// ════════════════════════════════════════════════════════
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.setAttribute('data-theme', isDark?'':'light');
+  document.querySelector('.theme-btn').textContent = isDark?'☀️':'🌙';
+}
+
+// ════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════
+function toast(msg, type='success') {
+  const el = document.getElementById('toast-el');
+  el.textContent = (type==='success'?'✓ ':type==='error'?'✗ ':'ℹ ') + msg;
+  el.className = `toast toast-${type} show`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ════════════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════════════
+function capitalize(s) { return s ? s[0].toUpperCase()+s.slice(1) : ''; }
+function statusLabel(s) {
+  return {open:'Open',in_progress:'In Progress',closed:'Closed'}[s] || s;
+}
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+// ════════════════════════════════════════════════════════
+// BOOT — check existing session
+// ════════════════════════════════════════════════════════
+(async () => {
+  const session = await authClient.getSession();
+  if (session) {
+    api.setToken(session.access_token);
+    window.currentUser = session.user;
+    hideAuthPage();
+    await initApp();
+  } else {
+    showAuthPage();
+  }
+})();
+</script>
+</body>
+</html>
