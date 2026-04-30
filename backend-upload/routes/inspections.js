@@ -72,6 +72,7 @@ router.post('/', async (req, res) => {
     const { data, error } = await supabase
       .from('inspections')
       .insert({
+        user_id: req.userId,
         inspection_no: seqData,
         project_id, project_name, inspection_type, zone,
         inspection_date: inspection_date || new Date().toISOString().split('T')[0],
