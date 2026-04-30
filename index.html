@@ -460,7 +460,13 @@ td.bold{color:var(--text);font-weight:500}
             <div class="form-row form-row-2">
               <div class="form-group"><label>Inspector Name *</label><input class="form-control" id="f-inspector" placeholder="Full name"/></div>
               <div class="form-group"><label>Assign To</label>
-                <select class="form-control" id="f-assign"><option value="">Select team member...</option></select>
+                <div style="display:flex;gap:6px">
+                  <select class="form-control" id="f-assign-sel" style="flex:1" onchange="syncAssign(this)">
+                    <option value="">Select or type below...</option>
+                  </select>
+                  <input class="form-control" id="f-assign" placeholder="Or type name here..." style="flex:1"/>
+                </div>
+                <div style="font-size:10px;color:var(--text3);margin-top:3px">Select from list OR type any name manually</div>
               </div>
             </div>
           </div>
@@ -496,19 +502,92 @@ td.bold{color:var(--text);font-weight:500}
             </div>
             <div class="form-row form-row-2">
               <div class="form-group"><label>Reference Standard</label>
-                <select class="form-control" id="f-standard">
-                  <option>ASME B31.3 — Process Piping</option><option>AWS D1.1 — Structural Welding</option>
-                  <option>API 650 — Storage Tanks</option><option>SAES-W-011 — Welding (Aramco)</option>
-                  <option>ISO 3834 — Welding Quality</option><option>ACI 318 — Concrete</option>
-                  <option>ASTM A36 — Structural Steel</option><option>NACE SP0169 — Coating</option>
+                <select class="form-control" id="f-standard-sel" onchange="if(this.value){document.getElementById('f-standard').value=this.value}">
+                  <optgroup label="--- Saudi Aramco (SAES) ---">
+                    <option>SAES-W-011 — Welding Requirements for Pressure Vessels</option>
+                    <option>SAES-W-012 — Requirements for Welding Pressure Piping</option>
+                    <option>SAES-L-350 — Construction of Plant Piping</option>
+                    <option>SAES-L-450 — Construction of Transmission Lines</option>
+                    <option>SAES-Q-001 — Criteria for Concrete Structures</option>
+                    <option>SAES-Q-006 — Foundations</option>
+                    <option>SAES-M-001 — Structural Design Criteria</option>
+                    <option>SAES-A-004 — General Requirements for Pressure Testing</option>
+                    <option>SAES-H-001 — Industrial Protective Coatings</option>
+                    <option>SAES-H-002 — Coating Requirements for Pipelines</option>
+                    <option>SAES-B-068 — Fire Protection</option>
+                    <option>SAES-P-100 — Basic Design Criteria Electrical</option>
+                  </optgroup>
+                  <optgroup label="--- ASME ---">
+                    <option>ASME B31.3 — Process Piping</option>
+                    <option>ASME B31.4 — Pipeline Transportation</option>
+                    <option>ASME B31.8 — Gas Transmission</option>
+                    <option>ASME Sec. IX — Welding Qualifications</option>
+                    <option>ASME Sec. VIII Div.1 — Pressure Vessels</option>
+                  </optgroup>
+                  <optgroup label="--- AWS ---">
+                    <option>AWS D1.1 — Structural Welding Steel</option>
+                    <option>AWS D1.6 — Structural Welding Stainless Steel</option>
+                  </optgroup>
+                  <optgroup label="--- API ---">
+                    <option>API 650 — Welded Steel Tanks</option>
+                    <option>API 653 — Tank Inspection & Repair</option>
+                    <option>API 570 — Piping Inspection Code</option>
+                    <option>API 510 — Pressure Vessel Inspection</option>
+                    <option>API 1104 — Welding Pipelines</option>
+                  </optgroup>
+                  <optgroup label="--- ISO / Other ---">
+                    <option>ISO 3834 — Quality Requirements Welding</option>
+                    <option>ISO 9001 — Quality Management Systems</option>
+                    <option>ACI 318 — Building Code Concrete</option>
+                    <option>NACE SP0169 — External Corrosion Control</option>
+                    <option>AISC 360 — Structural Steel Buildings</option>
+                  </optgroup>
                 </select>
+                <input class="form-control" id="f-standard" placeholder="Selected standard (or type your own)" style="margin-top:6px" value="ASME B31.3 — Process Piping"/>
+                <div style="font-size:10px;color:var(--text3);margin-top:3px">Select from list above OR edit/type your own standard below</div>
               </div>
               <div class="form-group"><label>Inspection Method</label>
-                <select class="form-control" id="f-method">
-                  <option>Visual Inspection (VT)</option><option>Ultrasonic Testing (UT)</option>
-                  <option>Radiographic Testing (RT)</option><option>Magnetic Particle (MT)</option>
-                  <option>Dye Penetrant (PT)</option><option>Dimensional Check</option><option>Hardness Testing (HT)</option>
+                <select class="form-control" id="f-method-sel" onchange="if(this.value){document.getElementById('f-method').value=this.value}">
+                  <optgroup label="--- NDT Methods ---">
+                    <option>Visual Inspection (VT)</option>
+                    <option>Ultrasonic Testing (UT)</option>
+                    <option>Radiographic Testing (RT)</option>
+                    <option>Magnetic Particle Testing (MT)</option>
+                    <option>Dye Penetrant Testing (PT)</option>
+                    <option>Eddy Current Testing (ET)</option>
+                    <option>Positive Material Identification (PMI)</option>
+                    <option>Ferrite Testing</option>
+                    <option>Holiday Testing</option>
+                    <option>Hardness Testing (HT)</option>
+                  </optgroup>
+                  <optgroup label="--- Dimensional ---">
+                    <option>Dimensional Check</option>
+                    <option>Alignment Check</option>
+                    <option>Bolt Torque Verification</option>
+                    <option>DFT Measurement (Coating)</option>
+                    <option>Surface Profile Check</option>
+                    <option>Concrete Cover Measurement</option>
+                  </optgroup>
+                  <optgroup label="--- Testing ---">
+                    <option>Hydrostatic Testing</option>
+                    <option>Pneumatic Testing</option>
+                    <option>Pressure Testing</option>
+                    <option>Leak Testing</option>
+                    <option>Performance Test</option>
+                    <option>Loop Check</option>
+                    <option>Function Test</option>
+                  </optgroup>
+                  <optgroup label="--- Civil / Structural ---">
+                    <option>Pre-Pour Inspection</option>
+                    <option>Rebar Inspection</option>
+                    <option>Concrete Cube Test</option>
+                    <option>Compaction Test</option>
+                    <option>Pile Integrity Test</option>
+                    <option>Walk-Through Inspection</option>
+                  </optgroup>
                 </select>
+                <input class="form-control" id="f-method" placeholder="Selected method (or type your own)" style="margin-top:6px" value="Visual Inspection (VT)"/>
+                <div style="font-size:10px;color:var(--text3);margin-top:3px">Select from list above OR edit/type your own method</div>
               </div>
             </div>
             <div class="form-group">
@@ -866,6 +945,13 @@ async function initApp() {
       const o = document.createElement('option');
       o.value = m.id; o.textContent = m.full_name;
       sel.appendChild(o);
+      // Also populate the new assign dropdown
+      const sel2 = document.getElementById('f-assign-sel');
+      if (sel2) {
+        const o2 = document.createElement('option');
+        o2.value = m.id; o2.textContent = m.full_name;
+        sel2.appendChild(o2);
+      }
     });
 
     // Load dashboard & reports
@@ -1088,6 +1174,14 @@ function renderStep() {
   });
 }
 
+// Sync assign dropdown to text input
+function syncAssign(sel) {
+  if (sel.value) {
+    const text = sel.options[sel.selectedIndex].text;
+    document.getElementById('f-assign').value = text !== 'Select or type below...' ? text : '';
+  }
+}
+
 function setSev(el, type) {
   ['critical','major','minor','observation'].forEach(t => {
     document.getElementById('sb-'+t.replace('observation','obs')).className = 'sev-btn';
@@ -1202,7 +1296,7 @@ async function saveInspection() {
       severity: selectedSev,
       ncr_required: document.getElementById('f-ncr').value,
       assigned_to_id: assignId || null,
-      assigned_to_name: assignName,
+      assigned_to_name: document.getElementById('f-assign').value || assignName || '',
       image_urls: uploadedUrls,
       due_date: document.getElementById('f-due').value || null,
     };
