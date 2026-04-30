@@ -939,12 +939,17 @@ async function initApp() {
 
     // Load team for assignments
     teamMembers = await api.getTeam();
-    const sel = document.getElementById('f-assign');
-    sel.innerHTML = '<option value="">Select team member...</option>';
+    // f-assign is now a text input - populate the dropdown selector instead
+    const sel = document.getElementById('f-assign-sel');
+    if (sel) {
+      sel.innerHTML = '<option value="">Select or type below...</option>';
+      teamMembers.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m.id; o.textContent = m.full_name;
+        sel.appendChild(o);
+      });
+    }
     teamMembers.forEach(m => {
-      const o = document.createElement('option');
-      o.value = m.id; o.textContent = m.full_name;
-      sel.appendChild(o);
       // Also populate the new assign dropdown
       const sel2 = document.getElementById('f-assign-sel');
       if (sel2) {
@@ -1276,9 +1281,9 @@ async function saveInspection() {
   btn.disabled = true;
 
   try {
-    const assignSel = document.getElementById('f-assign');
-    const assignId = assignSel.value;
-    const assignName = assignId ? assignSel.options[assignSel.selectedIndex].text : '';
+    // f-assign is now a text input (combo field)
+    const assignName = document.getElementById('f-assign').value || '';
+    const assignId = null; // custom text entry - no UUID needed
 
     const inspectionData = {
       project_name: projectName,
