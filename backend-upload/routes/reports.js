@@ -696,7 +696,14 @@ function parseReportSections(text) {
         }
 
         if (section.content) {
-          const content = cleanText(section.content);
+  let content = cleanText(section.content);
+
+  // ✅ REMOVE standalone numbers like "2." "3." etc.
+  content = content.replace(/^\d+\.\s*$/gm, '');
+
+  // ✅ REMOVE duplicate numbering like "2. text"
+  content = content.replace(/^\d+\.\s+/gm, '');
+
 
           // Check if content has numbered list
           if (/^\d+\.\s/.test(content)) {
