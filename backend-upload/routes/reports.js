@@ -265,6 +265,14 @@ Priority: ${(d.severity || 'major').toUpperCase()}
 Target Closure: [appropriate timeline based on severity]
 NCR Status: OPEN
 
+IMPORTANT INSTRUCTIONS FOR UNIQUE CONTENT:
+- The corrective actions MUST be specific to THIS type of finding: "${d.findings}"
+- For "${d.inspection_type}" inspections, reference the exact repair/test procedures
+- Do NOT use generic actions — tailor every section to the specific defect described
+- Reference specific clause numbers from "${d.reference_standard || 'ASME B31.3'}"
+- Corrective actions must follow the actual repair sequence for this defect type
+- Verification requirements must match what is needed for THIS specific defect
+
 Use formal engineering passive voice. Be specific and technical. No conversational language.`;
 }
 
@@ -714,6 +722,29 @@ function buildPDF(doc, insp) {
         y += 4;
       });
     }
+  }
+
+  // ── PHOTO EVIDENCE SECTION ──────────────────────────────
+  if (insp.image_urls && insp.image_urls.length > 0) {
+    if (y > H - 120) { doc.addPage(); y = MARGIN; }
+    y += 8;
+    y = sectionBar(y, 'PHOTO EVIDENCE', C.navy) + 10;
+
+    // Note about photos
+    doc.rect(MARGIN, y, W - MARGIN * 2, 50).fill(C.light).stroke(C.border);
+    doc.fillColor(C.blue).font('Helvetica-Bold').fontSize(9)
+       .text('ATTACHED PHOTOGRAPHS:', MARGIN + 8, y + 8);
+    doc.fillColor(C.gray).font('Helvetica').fontSize(8.5);
+    insp.image_urls.forEach((url, idx) => {
+      const shortUrl = url.length > 80 ? url.slice(0, 80) + '...' : url;
+      doc.text(`Photo ${idx + 1}: ${shortUrl}`, MARGIN + 8, y + 20 + (idx * 12), { width: W - MARGIN * 2 - 16 });
+    });
+    y += 60;
+
+    doc.fillColor(C.lgray).font('Helvetica').fontSize(7.5).font('Helvetica-Oblique')
+       .text('Note: Original high-resolution photographs are stored in the QC Inspector system and available on request.', 
+             MARGIN, y, { width: W - MARGIN * 2 });
+    y = doc.y + 12;
   }
 
   // ── SIGN-OFF BOX ─────────────────────────────────────────
