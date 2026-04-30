@@ -1,6 +1,3 @@
-bash
-
-cat > /home/claude/qc-inspector/backend/routes/reports.js << 'REPORTSEOF'
 // routes/reports.js — AI report generation + Professional PDF export
 'use strict';
 
@@ -767,8 +764,3 @@ function buildPDF(doc, insp) {
 }
 
 module.exports = router;
-REPORTSEOF
-echo "reports.js written"
-Output
-
-reports.js written
