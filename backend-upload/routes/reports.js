@@ -508,29 +508,42 @@ function buildPDF(doc, insp) {
       .trim();
   }
 
-  // ── Parse AI report into sections ───────────────────────────
-  function parseReportSections(text) {
-    if (!text) return null;
-    const clean = cleanText(text);
-    const sections = [];
+function parseReportSections(text) {
+  if (!text) return null;
 
-    // Extract numbered sections
-    const sectionRegex = /(\d+)\.\s+([A-Z][A-Z\s&\/]+)\s*[-=]*\s*\n([\s\S]*?)(?=\n\d+\.\s+[A-Z]|$)/g;
-    let match;
-    while ((match = sectionRegex.exec(clean)) !== null) {
+  const clean = cleanText(text);
+
+  const titles = [
+    'SCOPE & LOCATION',
+    'OBSERVATIONS',
+    'NON-CONFORMANCE DESCRIPTION',
+    'CORRECTIVE ACTION REQUIRED',
+    'VERIFICATION REQUIREMENTS',
+    'RESPONSIBLE PARTY & TIMELINE'
+  ];
+
+  const sections = [];
+
+  titles.forEach((title, index) => {
+    const regex = new RegExp(`${title}[\\s\\S]*?(?=${titles.join('|')}|$)`, 'i');
+    const match = clean.match(regex);
+
+    if (match) {
       sections.push({
-        num:     match[1],
-        title:   match[2].trim(),
-        content: match[3].trim(),
+        num: index + 1, // ✅ FORCE correct numbering
+        title,
+        content: match[0].replace(title, '').trim()
       });
     }
+  });
 
-    if (sections.length === 0) {
-      // Fallback: just return clean text
-      return [{ num: '', title: 'NCR REPORT', content: clean }];
-    }
-    return sections;
+  // fallback
+  if (sections.length === 0) {
+    return [{ num: 1, title: 'REPORT', content: clean }];
   }
+
+  return sections;
+}
 
   // ── Helper: draw horizontal rule ───────────────────────────
   function hRule(y, color, thick) {
