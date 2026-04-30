@@ -85,6 +85,7 @@ router.post('/', async (req, res) => {
         due_date,
         status: 'open',
         created_by: req.userId,
+        user_id: req.userId,
       })
       .select()
       .single();
