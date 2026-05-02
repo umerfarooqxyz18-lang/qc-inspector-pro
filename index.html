@@ -1232,25 +1232,20 @@ async function aiWriteCorrectiveActions() {
     });
     if (res.actions && res.actions.length > 0) {
       document.getElementById('f-corrective').value =
-        res.actions.map((a, i) => (i+1) + '. ' + a).join('
-');
+        res.actions.map((a, i) => (i+1) + '. ' + a) .join('\n');
       document.getElementById('f-verification').value =
-        '1. Re-inspect all affected areas after corrective action is complete.
-' +
-        '2. QC Inspector sign-off required before resuming work.
-' +
-        '3. All test records and photos to be filed with NCR package.
-' +
-        '4. Final verification report to be submitted to QC Engineer.';
+        '1. Re-inspect all affected areas after corrective action is complete.\n' +
+'2. QC Inspector sign-off required before resuming work.\n' +
+'3. All test records and photos to be filed with NCR package.\n' +
+'4. Final verification report to be submitted to QC Engineer.';
       toast('AI corrective actions generated!', 'success');
     }
   } catch(e) {
     // Fallback corrective actions based on severity
     const sev = selectedSev;
     document.getElementById('f-corrective').value =
-      '1. Immediately stop work and quarantine the affected area.
-' +
-      '2. Mark with NCR tag and notify QC Supervisor.
+     '1. Immediately stop work and quarantine the affected area.\n' +
+'2. Mark with NCR tag and notify QC Supervisor.\n' +
 ' +
       '3. Conduct detailed inspection of all affected components.
 ' +
