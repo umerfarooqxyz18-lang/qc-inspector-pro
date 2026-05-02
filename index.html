@@ -289,7 +289,7 @@ td.bold{color:var(--text);font-weight:500}
         <div class="form-group"><label>Email Address</label><input class="form-control" type="email" id="login-email" placeholder="you@company.com" autocomplete="email"/></div>
         <div class="form-group"><label>Password</label><input class="form-control" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/></div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" id="login-btn" onclick="handleLogin()">Sign In</button>
-
+        <p style="font-size:11px;color:var(--text3);text-align:center">Demo: <strong>demo@qcinspector.io</strong> / <strong>demo1234</strong></p>
       </div>
     </div>
 
@@ -498,24 +498,6 @@ td.bold{color:var(--text);font-weight:500}
                 <label>Observation / Finding Description *</label>
                 <textarea class="form-control" id="f-findings" rows="5" placeholder="Describe the finding in detail..." oninput="highlightKeywords(this)"></textarea>
                 <div id="findings-highlighted" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
-              </div>
-              <div class="card" style="margin-top:14px;background:var(--bg3);border:1px solid var(--border)">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                  <div style="width:26px;height:26px;background:linear-gradient(135deg,#4f7ef8,#a855f7);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px">🤖</div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text)">AI Assistant</div>
-                    <div style="font-size:11px;color:var(--text3)">Click to generate corrective actions & verification requirements for this specific problem</div>
-                  </div>
-                  <button class="btn btn-primary" style="margin-left:auto;padding:6px 12px;font-size:11px" onclick="aiWriteCorrectiveActions()" id="ai-ca-btn">✨ Generate with AI</button>
-                </div>
-                <div class="form-group" style="margin-bottom:10px">
-                  <label>Corrective Action Required</label>
-                  <textarea class="form-control" id="f-corrective" rows="4" placeholder="Click 'Generate with AI' above, or type manually..."></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Verification Requirements</label>
-                  <textarea class="form-control" id="f-verification" rows="3" placeholder="What tests/inspections are needed to close this NCR..."></textarea>
-                </div>
               </div>
             </div>
             <div class="form-row form-row-2">
@@ -758,7 +740,7 @@ td.bold{color:var(--text);font-weight:500}
         <div class="plan-card featured">
           <div class="plan-badge">⭐ Most Popular</div>
           <div class="plan-name">Pro</div>
-          <div class="plan-price">$20 <span>/ user / month</span></div>
+          <div class="plan-price">$79 <span>/ user / month</span></div>
           <div class="plan-desc">For professional QC teams on site</div>
           <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Unlimited inspections</div>
           <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Full AI NCR generation (Claude)</div>
@@ -770,7 +752,7 @@ td.bold{color:var(--text);font-weight:500}
         </div>
         <div class="plan-card">
           <div class="plan-name">Enterprise</div>
-          <div class="plan-price">$100 <span>/ month</span></div>
+          <div class="plan-price">$399 <span>/ month</span></div>
           <div class="plan-desc">For Aramco, EPC firms & megaprojects</div>
           <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Everything in Pro</div>
           <div class="plan-feature"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Unlimited team members</div>
@@ -1213,56 +1195,6 @@ function setSev(el, type) {
   selectedSev = type;
 }
 
-// AI write corrective actions for specific problem
-async function aiWriteCorrectiveActions() {
-  const findings = document.getElementById('f-findings').value;
-  if (!findings || findings.trim().length < 5) {
-    toast('Please enter your findings first', 'error');
-    return;
-  }
-  const btn = document.getElementById('ai-ca-btn');
-  btn.textContent = '⏳ Writing...';
-  btn.disabled = true;
-  try {
-    const res = await api.suggestActions({
-      findings: findings,
-      severity: selectedSev,
-      inspection_type: document.getElementById('f-type').value,
-      reference_standard: document.getElementById('f-standard').value,
-    });
-    if (res.actions && res.actions.length > 0) {
-      document.getElementById('f-corrective').value =
-        res.actions.map((a, i) => (i+1) + '. ' + a) .join('\n');
-      document.getElementById('f-verification').value =
-        '1. Re-inspect all affected areas after corrective action is complete.\n' +
-'2. QC Inspector sign-off required before resuming work.\n' +
-'3. All test records and photos to be filed with NCR package.\n' +
-'4. Final verification report to be submitted to QC Engineer.';
-      toast('AI corrective actions generated!', 'success');
-    }
-  } catch(e) {
-    // Fallback corrective actions based on severity
-    const sev = selectedSev;
-    document.getElementById('f-corrective').value =
-     '1. Immediately stop work and quarantine the affected area.\n' +
-'2. Mark with NCR tag and notify QC Supervisor.\n' +
-      '3. Conduct detailed inspection of all affected components.
-' +
-      '4. Prepare corrective action plan for QC Engineer approval.
-' +
-      '5. Repair/replace per approved procedure, then re-inspect.';
-    document.getElementById('f-verification').value =
-      '1. Re-inspection by Lead QC Inspector after repair.
-' +
-      '2. All documentation filed with NCR package.
-' +
-      '3. QC Supervisor sign-off required before closure.';
-    toast('Using standard template (add AI credits for custom)', 'info');
-  }
-  btn.textContent = '✨ Generate with AI';
-  btn.disabled = false;
-}
-
 // Keyword highlighting in findings textarea
 const CRITICAL_KW = ['crack','fracture','rupture','collapse','failure','unsafe','leak','corrosion','buckle'];
 const MAJOR_KW    = ['porosity','delamination','inadequate','non-compliant','defect','weld defect','misalignment','out of tolerance'];
@@ -1364,8 +1296,6 @@ async function saveInspection() {
       humidity: document.getElementById('f-humidity').value || null,
       weather: document.getElementById('f-weather').value,
       findings,
-      corrective_action: document.getElementById('f-corrective')?.value || '',
-      verification_requirements: document.getElementById('f-verification')?.value || '',
       reference_standard: document.getElementById('f-standard').value,
       inspection_method: document.getElementById('f-method').value,
       severity: selectedSev,
