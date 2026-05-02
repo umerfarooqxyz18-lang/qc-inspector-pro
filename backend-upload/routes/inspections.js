@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
         inspection_date, inspector_name, severity, status, 
         created_at, image_urls, assigned_to_name
       `)
+      .eq('created_by', req.userId)   // ← ONLY show this user's data
       .order('created_at', { ascending: false })
       .range(Number(offset), Number(offset) + Number(limit) - 1);
 
@@ -56,7 +57,8 @@ router.post('/', async (req, res) => {
     const {
       project_id, project_name, inspection_type, zone, inspection_date,
       inspector_name, contractor, temperature, humidity, weather,
-      findings, reference_standard, inspection_method, severity,
+      findings, corrective_action, verification_requirements,
+      reference_standard, inspection_method, severity,
       ncr_required, assigned_to_id, assigned_to_name, image_urls, due_date
     } = req.body;
 
@@ -72,21 +74,20 @@ router.post('/', async (req, res) => {
     const { data, error } = await supabase
       .from('inspections')
       .insert({
-        user_id: req.userId,
         inspection_no: seqData,
         project_id, project_name, inspection_type, zone,
         inspection_date: inspection_date || new Date().toISOString().split('T')[0],
         inspector_id: req.userId,
         inspector_name,
         contractor, temperature, humidity, weather,
-        findings, reference_standard, inspection_method,
+        findings, corrective_action, verification_requirements,
+        reference_standard, inspection_method,
         severity: severity || 'minor',
         ncr_required, assigned_to_id, assigned_to_name,
         image_urls: image_urls || [],
         due_date,
         status: 'open',
         created_by: req.userId,
-        user_id: req.userId,
       })
       .select()
       .single();
