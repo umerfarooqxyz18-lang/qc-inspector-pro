@@ -38,6 +38,38 @@ router.put('/profile', requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+async function handleLogin() {
+  const email = document.getElementById("login-email").value;
+  const password = document.getElementById("login-pass").value;
+
+  console.log("Login clicked", email); // DEBUG
+
+  if (!email || !password) {
+    document.getElementById("login-error").innerText = "Enter email and password";
+    return;
+  }
+
+  try {
+    // Example (if using Supabase)
+    const { data, error } = await authClient.signInWithPassword({
+      email: email,
+      password: password
+    });
+
+    if (error) {
+      document.getElementById("login-error").innerText = error.message;
+      return;
+    }
+
+    // SUCCESS
+    document.getElementById("auth-screen").style.display = "none";
+    document.getElementById("app").classList.remove("hidden");
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("login-error").innerText = "Login failed";
+  }
+}
 
 // GET /api/auth/team — get all team members (for assignment dropdowns)
 router.get('/team', requireAuth, async (req, res) => {
