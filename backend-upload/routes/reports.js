@@ -434,11 +434,50 @@ Respond ONLY with a JSON array (no markdown):
 });
 
 // ── GET /api/reports/pdf/:id ────────────────────────────────
+// Helper: download image from URL and return Buffer
+async function fetchImageBuffer(url) {
+  return new Promise((resolve) => {
+    try {
+      const https = require('https');
+      const http  = require('http');
+      const mod   = url.startsWith('https') ? https : http;
+      const req   = mod.get(url, { timeout: 8000 }, (resp) => {
+        if (resp.statusCode !== 200) return resolve(null);
+        const chunks = [];
+        resp.on('data', c => chunks.push(c));
+        resp.on('end',  () => resolve(Buffer.concat(chunks)));
+        resp.on('error', () => resolve(null));
+      });
+      req.on('error',   () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+    } catch(e) { resolve(null); }
+  });
+}
+
 router.get('/pdf/:inspection_id', async (req, res) => {
   try {
     const { data: insp, error } = await supabase
       .from('inspections').select('*').eq('id', req.params.inspection_id).single();
     if (error || !insp) return res.status(404).json({ error: 'Inspection not found' });
+
+    // Download all images as buffers BEFORE building PDF
+    const imageBuffers = [];
+    if (insp.image_urls && insp.image_urls.length > 0) {
+      for (const url of insp.image_urls) {
+        if (!url || typeof url !== 'string') continue;
+        try {
+          const buf = await fetchImageBuffer(url);
+          if (buf && buf.length > 100) {
+            imageBuffers.push({ buffer: buf, url });
+            console.log(`[PDF] Image fetched: ${buf.length} bytes`);
+          } else {
+            console.warn('[PDF] Empty or failed image:', url);
+          }
+        } catch (imgErr) {
+          console.warn('[PDF] Image error:', imgErr.message);
+        }
+      }
+    }
 
     const filename = `${insp.inspection_no || 'Report'}_QC_Report.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
@@ -447,7 +486,7 @@ router.get('/pdf/:inspection_id', async (req, res) => {
 
     const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true, autoFirstPage: true });
     doc.pipe(res);
-    buildPDF(doc, insp);
+    buildPDF(doc, insp, imageBuffers);
     doc.end();
   } catch (err) {
     console.error('[PDF]', err.message);
@@ -471,7 +510,8 @@ router.get('/', async (req, res) => {
 // ════════════════════════════════════════════════════════════
 // PROFESSIONAL PDF BUILDER
 // ════════════════════════════════════════════════════════════
-function buildPDF(doc, insp) {
+function buildPDF(doc, insp, imageBuffers) {
+  imageBuffers = imageBuffers || [];
   const W      = doc.page.width;
   const H      = doc.page.height;
   const MARGIN = 45;
@@ -750,27 +790,92 @@ function buildPDF(doc, insp) {
     y = doc.y + 10;
   }
 
-  // ── PHOTO EVIDENCE SECTION ──────────────────────────────
-  if (insp.image_urls && insp.image_urls.length > 0) {
-    if (y > H - 120) { doc.addPage(); y = MARGIN; }
-    y += 8;
-    y = sectionBar(y, 'PHOTO EVIDENCE', C.navy) + 10;
+  // ── PHOTO EVIDENCE SECTION — REAL EMBEDDED IMAGES ──────
+  const hasImages = imageBuffers && imageBuffers.length > 0;
+  const hasImageUrls = insp.image_urls && insp.image_urls.length > 0;
 
-    // Note about photos
-    doc.rect(MARGIN, y, W - MARGIN * 2, 50).fill(C.light).stroke(C.border);
-    doc.fillColor(C.blue).font('Helvetica-Bold').fontSize(9)
-       .text('ATTACHED PHOTOGRAPHS:', MARGIN + 8, y + 8);
-    doc.fillColor(C.gray).font('Helvetica').fontSize(8.5);
-    insp.image_urls.forEach((url, idx) => {
-      const shortUrl = url.length > 80 ? url.slice(0, 80) + '...' : url;
-      doc.text(`Photo ${idx + 1}: ${shortUrl}`, MARGIN + 8, y + 20 + (idx * 12), { width: W - MARGIN * 2 - 16 });
-    });
-    y += 60;
+  if (hasImages || hasImageUrls) {
+    // Add new page only if not enough room
+    if (y > H - 200) { doc.addPage(); y = MARGIN; }
+    else { y += 12; }
 
-    doc.fillColor(C.lgray).font('Helvetica').fontSize(7.5).font('Helvetica-Oblique')
-       .text('Note: Original high-resolution photographs are stored in the QC Inspector system and available on request.', 
-             MARGIN, y, { width: W - MARGIN * 2 });
-    y = doc.y + 12;
+    y = sectionBar(y, 'PHOTO EVIDENCE', C.navy) + 12;
+
+    // Count line
+    const photoCount = hasImages ? imageBuffers.length : insp.image_urls.length;
+    doc.fillColor(C.lgray).font('Helvetica').fontSize(8)
+       .text(`${photoCount} photograph(s) attached to this inspection report.`, MARGIN, y);
+    y += 18;
+
+    if (hasImages) {
+      // ── Embed actual images — 2 per row ──────────────────
+      const imgW   = (W - MARGIN * 2 - 12) / 2;  // 2 columns
+      const imgH   = 180;                           // height per photo
+      const capH   = 20;
+      const padH   = 10;
+
+      let rowStartY = y;
+      imageBuffers.forEach((imgData, idx) => {
+        const col = idx % 2;
+
+        // Start new row
+        if (col === 0 && idx > 0) {
+          rowStartY += imgH + capH + padH + 6;
+          y = rowStartY;
+        }
+
+        // New page if row won't fit
+        if (col === 0 && y + imgH + capH + padH > H - 60) {
+          doc.addPage();
+          y = MARGIN;
+          rowStartY = y;
+          y = sectionBar(y, 'PHOTO EVIDENCE (continued)', C.navy) + 12;
+          rowStartY = y;
+        }
+
+        const imgX = MARGIN + col * (imgW + 12);
+        const imgY = rowStartY;
+
+        try {
+          // Draw border around photo
+          doc.rect(imgX - 2, imgY - 2, imgW + 4, imgH + 4).fill(C.border);
+
+          // Embed the image
+          doc.image(imgData.buffer, imgX, imgY, {
+            width:  imgW,
+            height: imgH,
+            cover:  [imgW, imgH],
+            align:  'center',
+            valign: 'center',
+          });
+
+          // Photo caption
+          doc.rect(imgX, imgY + imgH - capH, imgW, capH).fill('rgba(10,31,92,0.75)');
+          doc.fillColor(C.white).font('Helvetica-Bold').fontSize(7.5)
+             .text(`Photo ${idx + 1} of ${imageBuffers.length}`, imgX + 4, imgY + imgH - capH + 6,
+                   { width: imgW - 8 });
+
+        } catch (embedErr) {
+          console.warn('[PDF] Image embed failed:', embedErr.message);
+          doc.rect(imgX, imgY, imgW, imgH).fill(C.light).stroke(C.border);
+          doc.fillColor(C.lgray).font('Helvetica').fontSize(9)
+             .text('Image unavailable', imgX, imgY + imgH/2 - 5, { width: imgW, align: 'center' });
+        }
+      });
+      // Move y past the last row
+      y = rowStartY + imgH + capH + padH + 6;
+
+    } else {
+      // No buffers but URLs exist — show as list
+      doc.rect(MARGIN, y, W - MARGIN * 2, 40 + hasImageUrls * 14).fill(C.light).stroke(C.border);
+      doc.fillColor(C.lgray).font('Helvetica-Oblique').fontSize(8)
+         .text('Photos were uploaded but could not be embedded. Available at:', MARGIN + 8, y + 8);
+      insp.image_urls.forEach((url, i) => {
+        doc.fillColor(C.blue).font('Helvetica').fontSize(7.5)
+           .text(`${i+1}. ${url}`, MARGIN + 8, y + 22 + i * 14, { width: W - MARGIN * 2 - 16 });
+      });
+      y += 44 + insp.image_urls.length * 14;
+    }
   }
 
   // ── SIGN-OFF BOX ─────────────────────────────────────────
@@ -802,11 +907,13 @@ function buildPDF(doc, insp) {
   });
 
   // ── PAGE NUMBERS & FOOTER ─────────────────────────────────
-  const totalPages = doc.bufferedPageRange().count;
+  // Flush all pages then add footers
+  const range      = doc.bufferedPageRange();
+  const totalPages = range.count;
+
   for (let i = 0; i < totalPages; i++) {
     doc.switchToPage(i);
-
-    // Footer
+    // Footer bar
     doc.rect(0, H - 28, W, 28).fill('#0a1f5c');
     doc.fillColor('rgba(255,255,255,0.6)').font('Helvetica').fontSize(7)
        .text(
