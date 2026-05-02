@@ -14,6 +14,7 @@ router.get('/', async (req, res) => {
     let query = supabase
       .from('issues')
       .select('*')
+      .eq('created_by', req.userId)   // ← ONLY show this user's issues
       .order('created_at', { ascending: false });
 
     if (status)         query = query.eq('status', status);
