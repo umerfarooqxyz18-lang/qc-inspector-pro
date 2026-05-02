@@ -435,23 +435,69 @@ Respond ONLY with a JSON array (no markdown):
 
 // ── GET /api/reports/pdf/:id ────────────────────────────────
 // Helper: download image from URL and return Buffer
+// Download image from Supabase Storage using service role (bypasses auth)
 async function fetchImageBuffer(url) {
-  return new Promise((resolve) => {
-    try {
+  try {
+    if (!url || typeof url !== 'string') return null;
+
+    // Extract the storage path from the URL
+    // URL format: https://xxx.supabase.co/storage/v1/object/public/inspection-images/USER_ID/FILE.jpg
+    const BUCKET = 'inspection-images';
+    const marker = `/object/public/${BUCKET}/`;
+    const altMarker = `/object/sign/${BUCKET}/`;
+
+    let storagePath = null;
+    if (url.includes(marker)) {
+      storagePath = url.split(marker)[1].split('?')[0];
+    } else if (url.includes(altMarker)) {
+      storagePath = url.split(altMarker)[1].split('?')[0];
+    }
+
+    if (storagePath) {
+      // Use Supabase service role to download — most reliable method
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .download(decodeURIComponent(storagePath));
+
+      if (!error && data) {
+        const arrayBuffer = await data.arrayBuffer();
+        const buf = Buffer.from(arrayBuffer);
+        if (buf.length > 100) {
+          console.log(`[PDF] Supabase download OK: ${storagePath} (${buf.length} bytes)`);
+          return buf;
+        }
+      } else {
+        console.warn('[PDF] Supabase download error:', error?.message, 'path:', storagePath);
+      }
+    }
+
+    // Fallback: direct HTTP fetch (works for truly public buckets)
+    return new Promise((resolve) => {
       const https = require('https');
       const http  = require('http');
       const mod   = url.startsWith('https') ? https : http;
-      const req   = mod.get(url, { timeout: 8000 }, (resp) => {
-        if (resp.statusCode !== 200) return resolve(null);
+      const reqOpts = { timeout: 10000 };
+      const req = mod.get(url, reqOpts, (resp) => {
+        if (resp.statusCode !== 200) {
+          console.warn('[PDF] HTTP fetch status:', resp.statusCode, url.slice(-50));
+          return resolve(null);
+        }
         const chunks = [];
         resp.on('data', c => chunks.push(c));
-        resp.on('end',  () => resolve(Buffer.concat(chunks)));
+        resp.on('end',  () => {
+          const buf = Buffer.concat(chunks);
+          console.log(`[PDF] HTTP fetch OK: ${buf.length} bytes`);
+          resolve(buf.length > 100 ? buf : null);
+        });
         resp.on('error', () => resolve(null));
       });
-      req.on('error',   () => resolve(null));
-      req.on('timeout', () => { req.destroy(); resolve(null); });
-    } catch(e) { resolve(null); }
-  });
+      req.on('error',   (e) => { console.warn('[PDF] HTTP error:', e.message); resolve(null); });
+      req.on('timeout', ()  => { req.destroy(); resolve(null); });
+    });
+  } catch(e) {
+    console.error('[PDF] fetchImageBuffer exception:', e.message);
+    return null;
+  }
 }
 
 router.get('/pdf/:inspection_id', async (req, res) => {
