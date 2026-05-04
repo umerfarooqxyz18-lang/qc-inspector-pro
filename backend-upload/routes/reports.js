@@ -198,82 +198,537 @@ router.get('/constants', (req, res) => {
   });
 });
 
-// ── Prompt builder ───────────────────────────────────────────
+// ── Master AI Prompt Builder ─────────────────────────────────
+// Generates discipline-specific, standards-referenced NCR reports
 function buildPrompt(d) {
-  return `You are a Senior QA/QC Engineer (20+ years experience) in oil & gas and construction projects in Saudi Arabia. You are familiar with Saudi Aramco standards (SAES), ASME, AWS, API, and ISO standards.
 
-Generate a formal, professional Non-Conformance Report (NCR) from this inspection data:
+  // Build standards knowledge base based on inspection type
+  const discipline = (d.inspection_type || '').toLowerCase();
+  
+  let disciplineContext = '';
+  
+  if (discipline.includes('weld') || discipline.includes('ndt')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-W-011: Welding Requirements for On-Plot Process Equipment
+- SAES-W-012: Requirements for Welding Pressure Piping
+- ASME Section IX: Welding and Brazing Qualifications
+- AWS D1.1: Structural Welding Code - Steel
+- API 1104: Welding of Pipelines and Related Facilities
+- ASME B31.3: Process Piping (Chapter VI - Inspection, Examination, Testing)
+- ISO 3834: Quality Requirements for Fusion Welding of Metallic Materials
+- SAES-W-017: Positive Material Identification
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- ASME B31.3 Table 341.3.2: Examination acceptance criteria
+- AWS D1.1 Table 6.1: Visual inspection acceptance criteria
+- API 1104 Section 9: Acceptance standards for NDT`;
+  } else if (discipline.includes('concrete') || discipline.includes('civil') || discipline.includes('foundation')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-Q-001: Criteria for Design and Construction of Concrete Structures
+- SAES-Q-006: Foundations
+- ACI 318: Building Code Requirements for Structural Concrete
+- ACI 301: Specifications for Structural Concrete
+- ACI 305R: Guide to Hot Weather Concreting (critical in Saudi Arabia - temps >32C)
+- ACI 306R: Guide to Cold Weather Concreting
+- ASTM C31: Standard Practice for Making and Curing Concrete Test Specimens
+- ASTM C39: Standard Test Method for Compressive Strength of Cylindrical Specimens
+- ASTM C138: Density, Yield, and Air Content of Concrete
+- ASTM C143: Slump of Hydraulic-Cement Concrete
+- SAES-M-001: Structural Design Criteria
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- ACI 318 Section 26.12: Evaluation and Acceptance of Concrete
+- ACI 318 Table 20.6.1.3.1: Concrete cover requirements
+- ASTM C39: Minimum 28-day compressive strength f'c
+- ACI 305R: Maximum concrete temperature at discharge 35C in hot weather`;
+  } else if (discipline.includes('pipeline') || discipline.includes('piping')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-L-350: Construction of Plant Piping
+- SAES-L-450: Construction of Onshore and Nearshore Pipelines
+- ASME B31.3: Process Piping
+- ASME B31.4: Pipeline Transportation Systems for Liquids
+- ASME B31.8: Gas Transmission and Distribution Piping Systems
+- API 570: Piping Inspection Code
+- API 5L: Specification for Line Pipe
+- SAES-A-004: General Requirements for Pressure Testing
+- SAES-L-310: Design of Plant Piping
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- ASME B31.3 Para 341.4: Required Examination
+- ASME B31.3 Para 345: Testing requirements and test pressures
+- API 570 Section 5: Inspection practices
+- SAES-A-004: Hydrostatic test pressure = 1.5 x design pressure`;
+  } else if (discipline.includes('coating') || discipline.includes('paint')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-H-001: Selection Requirements for Industrial Protective Coatings
+- SAES-H-002: Coating Requirements for Onshore Pipelines
+- SAES-H-101: Approved Protective Coating Systems
+- SAES-H-200: Thermal Insulation for Mechanical Equipment and Piping
+- SSPC-SP 6: Commercial Blast Cleaning
+- SSPC-SP 10: Near-White Blast Cleaning
+- SSPC-PA 1: Shop, Field, and Maintenance Painting of Steel
+- SSPC-PA 2: Measurement of Dry Coating Thickness (DFT)
+- NACE SP0169: Control of External Corrosion on Underground Pipelines
+- ASTM D4285: Indicating Oil or Water in Compressed Air (Blotter Test)
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- SSPC-PA 2: DFT measurements - max 20% of readings below minimum
+- SAES-H-001: Surface preparation minimum SSPC-SP 10 for immersed service
+- ISO 8501-1: Surface cleanliness grades Sa 2.5 for most applications`;
+  } else if (discipline.includes('structural') || discipline.includes('steel')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-M-001: Structural Design Criteria
+- AISC 360: Specification for Structural Steel Buildings
+- AWS D1.1: Structural Welding Code - Steel
+- ASTM A36: Standard Specification for Carbon Structural Steel
+- ASTM A325: High-Strength Bolts for Structural Steel Joints
+- ASTM A490: Heat-Treated Steel Structural Bolts
+- AISC Code of Standard Practice for Steel Buildings and Bridges
+- RCSC: Specification for Structural Joints using High-Strength Bolts
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- AWS D1.1 Table 6.1: Visual weld acceptance criteria
+- AISC 360 Section J3: Bolted connections torque requirements
+- ASTM F436: Hardened Steel Washers for structural bolting`;
+  } else if (discipline.includes('electrical')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-P-100: Basic Design Criteria for Electrical Systems
+- SAES-P-101: Grounding
+- SAES-P-104: Wiring Methods and Materials
+- SAES-P-111: Power Transformers
+- IEC 60364: Low-Voltage Electrical Installations
+- IEEE 80: Guide for Safety in AC Substation Grounding
+- NFPA 70: National Electrical Code (NEC)
+- IEC 60529: Degrees of Protection provided by Enclosures (IP Code)
+- API RP 505: Recommended Practice for Classification of Locations for Electrical Installations
+- SAES-B-067: Safety Requirements for Electrical Systems in Hazardous Areas
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- IEC 60364-6: Verification testing requirements
+- IEEE 1584: Arc Flash Hazard Calculations
+- SAES-P-101: Earth resistance maximum 1 ohm for main grounding grid`;
+  } else if (discipline.includes('mechanical') || discipline.includes('pressure vessel') || discipline.includes('equipment')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- ASME Section VIII Division 1: Rules for Construction of Pressure Vessels
+- ASME Section VIII Division 2: Alternative Rules
+- SAES-D-001: Design Criteria for Pressure Vessels
+- API 510: Pressure Vessel Inspection Code
+- API 650: Welded Steel Tanks for Oil Storage
+- API 653: Tank Inspection, Repair, Alteration and Reconstruction
+- ASME PCC-1: Guidelines for Pressure Boundary Bolted Flange Joint Assembly
+- ASME B16.5: Pipe Flanges and Flanged Fittings
+- API 598: Valve Inspection and Testing
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- ASME Sec VIII UG-125: Safety relief valve requirements
+- API 510 Section 7: Pressure testing after repair
+- ASME PCC-1: Flange bolt torque sequences and values
+- ASME B16.5: Flange rating pressure-temperature tables`;
+  } else if (discipline.includes('instrument') || discipline.includes('control')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-J-001: Measurement of Fluid Flow in Pipes
+- SAES-J-002: Instruments for Pressure Measurement
+- SAES-J-600: Safeguarding Instrumentation
+- IEC 61511: Functional Safety - Safety Instrumented Systems
+- IEC 61508: Functional Safety of E/E/PE Safety-related Systems
+- ISA 5.1: Instrumentation Symbols and Identification
+- ASME PTC 19.3: Temperature Measurement
+- API RP 551: Process Measurement Instrumentation
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- IEC 61511: SIL verification for safety functions
+- SAES-J-002: Calibration accuracy requirements
+- IEC 61508: Proof test intervals for SIS`;
+  } else if (discipline.includes('fire')) {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- SAES-B-068: Fire Prevention and Control
+- NFPA 13: Standard for the Installation of Sprinkler Systems
+- NFPA 14: Standard for Standpipe and Hose Systems
+- NFPA 25: Standard for the Inspection Testing and Maintenance of Water-Based Fire Protection
+- NFPA 72: National Fire Alarm and Signaling Code
+- API RP 2001: Fire Protection in Refineries
+- FM Global Property Loss Prevention Data Sheets
+KEY ACCEPTANCE CRITERIA TO REFERENCE:
+- NFPA 13 Section 24.1: Acceptance testing requirements
+- NFPA 25: Annual inspection and test requirements
+- SAES-B-068 Table 1: Minimum fire water flow rates`;
+  } else {
+    disciplineContext = `
+APPLICABLE STANDARDS FOR THIS DISCIPLINE:
+- ISO 9001: Quality Management Systems Requirements
+- SAES-A-004: General Requirements for Pressure Testing
+- Saudi Aramco General Instructions (GI) applicable to this work scope
+- Project Quality Plan and Inspection Test Plans (ITP)
+- Applicable ASTM, ASME, API, AWS, IEC standards for this discipline`;
+  }
 
-PROJECT: ${d.project_name || 'N/A'}
-REPORT NO: ${d.inspection_no || 'DRAFT'}
-INSPECTION TYPE: ${d.inspection_type || 'General Inspection'}
-ZONE / LOCATION: ${d.zone || 'Site'}
-DATE: ${d.inspection_date || new Date().toISOString().split('T')[0]}
-INSPECTOR: ${d.inspector_name || 'N/A'}
-CONTRACTOR: ${d.contractor || 'N/A'}
-ENVIRONMENTAL CONDITIONS: Temp ${d.temperature || 'N/A'}C | Humidity ${d.humidity || 'N/A'}%
-REFERENCE STANDARD: ${d.reference_standard || 'ASME B31.3'}
-INSPECTION METHOD: ${d.inspection_method || 'Visual Testing (VT)'}
-SEVERITY: ${(d.severity || 'major').toUpperCase()}
-ASSIGNED TO: ${d.assigned_to_name || 'TBD'}
+  const hasPhotos = d.image_urls && d.image_urls.length > 0;
+  const photoNote = hasPhotos 
+    ? `
+PHOTO EVIDENCE: ${d.image_urls.length} photograph(s) have been uploaded documenting this finding. Reference these as "Photographic Evidence Ref. ${d.inspection_no}-IMG-001 through ${d.inspection_no}-IMG-00${d.image_urls.length}" in your observations.`
+    : '';
 
-RAW FINDINGS FROM INSPECTOR:
-${d.findings}
+  return `You are a Principal QA/QC Engineer with 25+ years of experience in Saudi Aramco, oil & gas, petrochemical, and construction projects across all disciplines. You have deep expertise in Saudi Aramco Engineering Standards (SAES), ASME, ASTM, AWS, API, ACI, AISC, IEC, NFPA, NACE, and all applicable international standards.
 
-Generate a complete professional NCR report using ONLY standard ASCII characters (no special Unicode box-drawing characters). Use dashes and equals signs for separators.
+Your task: Generate a COMPLETELY TAILORED, HIGHLY DETAILED, PROFESSIONAL Non-Conformance Report (NCR) for this SPECIFIC finding. Every section must be written specifically for THIS observation - NOT generic text.
 
-FORMAT YOUR RESPONSE EXACTLY AS FOLLOWS:
+INSPECTION DATA:
+================
+Project: ${d.project_name || 'N/A'}
+Report No: ${d.inspection_no || 'DRAFT'}
+Date: ${d.inspection_date || new Date().toISOString().split('T')[0]}
+Inspector: ${d.inspector_name || 'N/A'}
+Contractor: ${d.contractor || 'N/A'}
+Discipline: ${d.inspection_type || 'General'}
+Zone/Location: ${d.zone || 'Site'}
+Inspection Method: ${d.inspection_method || 'Visual Testing'}
+Severity: ${(d.severity || 'major').toUpperCase()}
+Reference Standard: ${d.reference_standard || 'Applicable Standards'}
+Temperature: ${d.temperature || 'N/A'}C | Humidity: ${d.humidity || 'N/A'}%
+Assigned To: ${d.assigned_to_name || 'TBD'}
+${photoNote}
+
+INSPECTOR'S OBSERVATION (verbatim):
+"${d.findings}"
+
+${disciplineContext}
+
+INSTRUCTIONS - READ CAREFULLY:
+1. Write EVERY section specifically for THIS observation. Never use generic filler text.
+2. In Section 2 (Observations), expand the inspector's raw note into 3-5 detailed technical observations. Infer what an experienced engineer would observe based on the finding described.
+3. In Section 3 (Non-Conformance), cite the EXACT clause/paragraph number from the applicable standard. Explain WHY this is a problem and what RISK it creates.
+4. In Section 4 (Corrective Actions), write SPECIFIC repair/corrective steps for THIS EXACT type of defect - not generic steps. Include specific test parameters, acceptance criteria, and reference the applicable standard clause.
+5. In Section 5 (Verification), specify EXACT tests with acceptance criteria values (e.g., "Hydrostatic test at 1.5x design pressure per ASME B31.3 Para 345.4.2" not just "re-test").
+6. ${hasPhotos ? `Reference the photographic evidence in your observations section as supporting documentation.` : `Note that no photographic evidence was provided.`}
+7. Use ONLY standard ASCII characters - no special box-drawing Unicode characters.
+8. Write in formal engineering passive voice throughout.
+
+FORMAT YOUR RESPONSE EXACTLY AS FOLLOWS (copy headers exactly):
 
 NON-CONFORMANCE INSPECTION REPORT
 =====================================================
 Report No.: ${d.inspection_no || 'DRAFT'}        Date: ${d.inspection_date || new Date().toISOString().split('T')[0]}
 Project: ${d.project_name || 'N/A'}
+Discipline: ${d.inspection_type || 'N/A'}
 Inspector: ${d.inspector_name || 'N/A'}
-Standard: ${d.reference_standard || 'ASME B31.3'}
+Contractor: ${d.contractor || 'N/A'}
+Standard: ${d.reference_standard || 'Applicable Standards'}
 =====================================================
 
-SEVERITY: ${(d.severity || 'MAJOR').toUpperCase()}
+SEVERITY CLASSIFICATION: ${(d.severity || 'MAJOR').toUpperCase()}
 
 1. SCOPE & LOCATION
 -------------------
-[One paragraph describing inspection scope, location, and elements inspected. Reference specific equipment tag numbers, joint numbers, or area descriptions from the findings.]
+[2-3 sentences describing what was inspected, where exactly, and during which activity. Be specific about location reference (e.g., "Grid Line C-7", "Weld Joint W-14", "Column C3 Foundation"). Reference the inspection method used.]
 
 2. OBSERVATIONS
 ---------------
-[3-5 numbered technical observations with specific measurements, dimensions, joint references, and quantitative data where possible]
+[3-5 numbered observations. Each must be a specific technical finding. Include measurements, dimensions, quantities where inferrable. ${hasPhotos ? 'Reference photographic evidence.' : ''} Examples of good observations: "1. Concrete cover measured at 18mm (0.71 inch) on eastern face of Column C-3 foundation, falling below the minimum 40mm (1.57 inch) required by ACI 318 Table 20.6.1.3.1 for foundations exposed to soil." NOT "1. The foundation was not good."]
 
 3. NON-CONFORMANCE DESCRIPTION
 -------------------------------
-[Formal description of how the finding deviates from the reference standard. Cite specific clause numbers. Explain the technical risk and potential consequence if not corrected.]
+[Paragraph citing the EXACT standard clause violated. Format: "The identified condition constitutes a non-conformance with [STANDARD NAME] [Clause X.X.X], which requires [exact requirement]. The recorded [measurement/condition] of [value] deviates from the acceptance criterion of [value]. This non-conformance poses [specific technical risk] which may result in [specific consequence]."]
 
 4. CORRECTIVE ACTION REQUIRED
 ------------------------------
-1. [Immediate containment action]
-2. [Investigation / NDE action]
-3. [Repair / rework action per approved procedure]
-4. [Quality system preventive action]
-5. [Verification before resumption of work]
+1. IMMEDIATE: [Stop-work / containment / quarantine action specific to this defect type]
+2. INVESTIGATION: [Specific NDE or testing to determine full extent - with test method and acceptance criteria]
+3. REPAIR: [Specific repair procedure referencing the applicable standard repair clause and approved procedure requirement]
+4. DOCUMENTATION: [What WPS, method statement, or procedure must be submitted]
+5. PREVENTION: [Specific procedural or supervisory change to prevent recurrence]
+6. RE-INSPECTION: [Specific hold point - what test, what acceptance criterion, who signs off]
 
 5. VERIFICATION REQUIREMENTS
 -----------------------------
-[List specific tests, inspections, or documentation needed to close this NCR]
+[3-4 specific verification items. Each must state WHAT to test, HOW to test it, and WHAT the acceptance criterion is. Example: "1. Concrete core samples to be extracted at minimum 3 locations per ACI 318 Section 26.12.4 and tested per ASTM C39 - minimum accepted f'c = [project specification value] MPa." NOT just "re-inspect the area."]
 
 6. RESPONSIBLE PARTY & TIMELINE
 ---------------------------------
-Responsible: ${d.assigned_to_name || 'TBD'}
-Priority: ${(d.severity || 'major').toUpperCase()}
-Target Closure: [appropriate timeline based on severity]
-NCR Status: OPEN
+Responsible Party: ${d.assigned_to_name || 'Contractor QC Manager'}
+Severity: ${(d.severity || 'MAJOR').toUpperCase()}
+Required Closure: ${(d.severity || 'major') === 'critical' ? '24 hours - WORK STOPPAGE IN EFFECT' : (d.severity || 'major') === 'major' ? '3 working days' : '7 working days'} from NCR issue date
+Hold Point: QC Inspector and Company Representative sign-off required before resumption
+NCR Status: OPEN - Pending Corrective Action
 
-IMPORTANT INSTRUCTIONS FOR UNIQUE CONTENT:
-- The corrective actions MUST be specific to THIS type of finding: "${d.findings}"
-- For "${d.inspection_type}" inspections, reference the exact repair/test procedures
-- Do NOT use generic actions — tailor every section to the specific defect described
-- Reference specific clause numbers from "${d.reference_standard || 'ASME B31.3'}"
-- Corrective actions must follow the actual repair sequence for this defect type
-- Verification requirements must match what is needed for THIS specific defect
+Remember: Make this report COMPLETELY SPECIFIC to the observation: "${d.findings}". A reader should be able to use this report as a complete technical document to understand, fix, and close this specific finding.`;
+}
 
-Use formal engineering passive voice. Be specific and technical. No conversational language.`;
+// ════════════════════════════════════════════════════════════
+// SMART MOCK REPORT — Professional, discipline-specific,
+// standards-referenced. Used when no API key is present.
+// Reads: findings, inspection_type, reference_standard,
+//        severity, zone, contractor, inspector, photos.
+// ════════════════════════════════════════════════════════════
+function smartMockReport(d) {
+  const date      = new Date().toLocaleDateString('en-GB');
+  const sev       = (d.severity || 'major').toUpperCase();
+  const std       = d.reference_standard || 'ASME B31.3';
+  const type      = d.inspection_type    || 'General Inspection';
+  const findings  = d.findings           || 'Non-conformance identified during inspection.';
+  const zone      = d.zone               || 'Site';
+  const inspector = d.inspector_name     || 'N/A';
+  const assigned  = d.assigned_to_name   || 'Contractor QC Manager';
+  const no        = d.inspection_no      || 'DRAFT';
+  const project   = d.project_name       || 'N/A';
+  const method    = d.inspection_method  || 'Visual Testing (VT)';
+  const hasPhotos = d.image_urls && d.image_urls.length > 0;
+  const photoRef  = hasPhotos ? `Photographic evidence referenced as ${no}-IMG-001 through ${no}-IMG-00${d.image_urls.length} supports the findings documented below.` : '';
+
+  const disc = type.toLowerCase();
+  const timeline = sev === 'CRITICAL' ? '24 hours - IMMEDIATE WORK STOPPAGE IN EFFECT'
+                 : sev === 'MAJOR'    ? '3 working days'
+                 : sev === 'MINOR'    ? '7 working days'
+                 : '14 working days';
+
+  // ── Discipline-specific content ───────────────────────────
+  let scope = '', observations = '', nonConformance = '',
+      correctiveActions = '', verification = '';
+
+  if (disc.includes('weld') || disc.includes('ndt')) {
+    scope = `Inspection of welding works and associated NDT activities was conducted at ${zone} in accordance with ${std} and applicable Saudi Aramco Engineering Standards SAES-W-011 and SAES-W-012. Inspection scope included visual examination of weld joints, dimensional verification, and assessment of weld profile and surface condition. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. Visual examination revealed surface discontinuities inconsistent with the acceptance criteria defined in AWS D1.1 Table 6.1 and ASME B31.3 Table 341.3.2.
+3. Weld geometry and profile deviations were identified indicating potential inadequate fusion, incomplete penetration, or surface irregularity beyond permissible limits.
+4. Affected weld joint(s) require mandatory NDE (Radiographic or Ultrasonic Testing) to determine subsurface extent of non-conformance per ASME Section V Article 2 / Article 5.
+5. Environmental conditions at time of inspection: Temp ${d.temperature || 'N/A'}C, Humidity ${d.humidity || 'N/A'}% - within/outside permissible range per SAES-W-011 Para 6.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with ${std} Table 341.3.2 (Examination Acceptance Criteria) and SAES-W-011 Section 6, which requires all welds to meet specified visual and dimensional acceptance criteria before proceeding to pressure testing or commissioning activities. The recorded condition deviates from acceptance requirements. This non-conformance poses risk of weld failure under operating pressure and temperature cycling, potentially resulting in loss of containment, process safety incident, and structural integrity compromise. Welding Procedure Specification (WPS) compliance and Welder Qualification Records (WQR) shall be reviewed to identify root cause.`;
+    
+    correctiveActions = `1. IMMEDIATE: Quarantine and tag all identified non-conforming weld joints with NCR identification. Suspend welding activities on affected spool/structure pending corrective action approval.
+2. INVESTIGATION: Conduct 100% Radiographic Testing (RT) or Ultrasonic Testing (UT) per ASME Section V on all affected welds to determine extent of sub-surface defects. Accept/reject per ASME B31.3 Para 341.3.2.
+3. REPAIR: Prepare and submit Weld Repair Procedure for Company QC Engineer approval. Repair defective weld(s) per approved WPS using qualified welder. Remove defect to sound metal by grinding/gouging per ASME B31.3 Para 328.6.
+4. DOCUMENTATION: Submit revised Weld Map, updated Weld Log, and WQR for affected welder(s). Review welder performance qualification per ASME Section IX.
+5. PREVENTION: Implement increased in-process inspection frequency. Assign QC Inspector as mandatory hold point at fit-up and root pass stages for this contractor.
+6. RE-INSPECTION: 100% NDE on repaired welds. Visual acceptance per AWS D1.1 Table 6.1. Final sign-off by Company QC Inspector and QC Supervisor required.`;
+    
+    verification = `1. 100% RT or UT examination of repaired weld joints per ASME Section V, acceptance per ASME B31.3 Table 341.3.2 - No linear indications exceeding permissible limits.
+2. Dimensional verification of weld profile (reinforcement, undercut, overlap) per AWS D1.1 Table 6.1 - measured with calibrated welding gauge.
+3. Hardness testing (if applicable) per SAES-W-011 Para 7 - Maximum 248 HV10 for carbon steel.
+4. Pressure test (hydrostatic) on repaired piping/spool at 1.5x design pressure per ASME B31.3 Para 345.4.2 for minimum 10 minutes.
+5. Company QC Inspector and QC Supervisor sign-off on NCR Corrective Action Report before resuming work.`;
+
+  } else if (disc.includes('concrete') || disc.includes('civil') || disc.includes('foundation')) {
+    scope = `Inspection of concrete works and civil construction activities was conducted at ${zone} in accordance with ${std}, SAES-Q-001 (Criteria for Design and Construction of Concrete Structures), and ACI 318 (Building Code Requirements for Structural Concrete). Inspection scope included pre-pour/post-pour verification, concrete cover measurement, rebar placement, formwork condition, and concrete placement compliance. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. Concrete cover measurements at multiple locations found to deviate from the minimum specified cover requirements per ACI 318 Table 20.6.1.3.1 and project specifications.
+3. Concrete placement and/or compaction methods observed to be inconsistent with ACI 301 Section 5.3 requirements for consolidation of concrete.
+4. Slump test results and/or concrete temperature at point of discharge require verification against ACI 305R limits (maximum 35C discharge temperature in hot weather applicable to Saudi Arabia climate).
+5. Cube/cylinder specimens (per ASTM C31) taken for 7-day and 28-day compressive strength verification per ASTM C39. Results pending.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with ${std} and SAES-Q-001 Section 5, which specifies mandatory quality control requirements for all concrete placement activities. The recorded condition deviates from the acceptance criterion specified in ACI 318 and the Project Quality Plan. In the environmental conditions of Saudi Arabia (high ambient temperatures per ACI 305R), inadequate concrete placement procedures pose risk of reduced compressive strength, increased permeability, premature cracking, and reduced structural service life. This directly impacts the structural integrity and long-term durability of the foundation/structure.`;
+    
+    correctiveActions = `1. IMMEDIATE: Stop concrete placement activities in the affected area. Mark and segregate non-conforming work with NCR tag.
+2. INVESTIGATION: Extract concrete core samples (minimum 3 per ACI 318 Section 26.12.4) from affected pour and test per ASTM C39. Schmidt Hammer rebound test per ASTM C805 as preliminary assessment.
+3. REPAIR: Based on core test results - if f'c < 85% of specified strength: prepare repair method statement per ACI 318 Section 26.4 for Company Engineer approval. Options: epoxy injection, concrete replacement, or structural strengthening design.
+4. DOCUMENTATION: Submit non-conforming pour records, batch plant mix design verification, delivery tickets, and all QC test results to Company QC Engineer.
+5. PREVENTION: Implement mandatory concrete pre-placement checklist. Assign dedicated QC Inspector for all concrete pours. Verify batch plant calibration per ASTM C94.
+6. RE-INSPECTION: Verify corrective repair meets ACI 318 acceptance criteria. Hold point: Company QC Engineer approval of repair method prior to execution.`;
+    
+    verification = `1. Core sample compressive strength per ASTM C39 - minimum f'c = project specified value (typically 30-40 MPa). Test at 7 and 28 days.
+2. Concrete cover verification per ACI 318 Table 20.6.1.3.1 using calibrated cover meter (Profometer or equivalent) - minimum 75mm for foundations exposed to soil.
+3. Slump test per ASTM C143 at point of discharge - maximum 175mm (7 inches) unless otherwise specified.
+4. Concrete temperature at discharge per ACI 305R - maximum 35C for hot weather concreting in Saudi Arabia.
+5. Company QC Engineer and Structural Engineer sign-off on repair method statement and post-repair inspection report.`;
+
+  } else if (disc.includes('pipeline') || disc.includes('piping')) {
+    scope = `Inspection of pipeline/piping construction activities was conducted at ${zone} in accordance with ${std}, SAES-L-350 (Construction of Plant Piping), and applicable Saudi Aramco Project Standards. Inspection scope covered pipe installation, joint assembly, dimensional verification, and pre-test conditions. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. Visual inspection identified deviations from the specified installation requirements per SAES-L-350 and ${std}.
+3. Pipe alignment, support spacing, and/or joint assembly conditions were found to be outside permissible tolerances per ASME B31.3 Para 335.
+4. Material identification and traceability markings require verification against mill certificates per SAES-L-350 Section 8 and API 5L.
+5. Pre-hydrostatic test checklist items incomplete - mandatory hold points not cleared per SAES-A-004 requirements.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with ${std} and SAES-L-350, which specifies mandatory requirements for plant piping construction. The deviation from specified installation requirements poses risk of failure under design operating pressure, temperature, and cyclic loading conditions. Per ASME B31.3 Para 341.4, all examination requirements must be met before pressure testing. Failure to comply may result in loss of containment, process safety incident, and loss of production.`;
+    
+    correctiveActions = `1. IMMEDIATE: Place NCR hold on affected piping section. Do not proceed to pressure testing until NCR is closed.
+2. INVESTIGATION: Complete 100% visual examination and dimensional check of all affected joints per ASME B31.3 Para 341.4. Conduct NDE as required by service classification.
+3. REPAIR: Correct installation deficiencies per ASME B31.3 Para 328 and approved construction procedure. Re-examine all repaired joints per original examination requirements.
+4. DOCUMENTATION: Update as-built drawings and weld/joint records. Verify all material traceability documentation per SAES-L-350 Section 8.
+5. PREVENTION: Review and update Inspection Test Plan (ITP). Implement mandatory QC hold points at critical installation stages.
+6. RE-INSPECTION: Hydrostatic test at 1.5x MAWP per ASME B31.3 Para 345.4.2. Company QC Inspector witness and sign-off required.`;
+    
+    verification = `1. Hydrostatic pressure test at 1.5x Maximum Allowable Working Pressure (MAWP) per ASME B31.3 Para 345.4.2 for minimum 10 minutes with no visible leaks or pressure drop.
+2. 100% visual examination of all repaired joints per ASME B31.3 Para 341.4.1 - zero visible defects.
+3. NDE (RT/UT) on repaired welds per ASME B31.3 Table 341.3.2 acceptance criteria.
+4. Dimensional verification of pipe alignment per ASME B31.3 Para 335 - within ±3mm of specified position.
+5. Company QC Inspector and Operations Representative sign-off on completed Punch List before handover.`;
+
+  } else if (disc.includes('coating') || disc.includes('paint')) {
+    scope = `Inspection of protective coating/painting works was conducted at ${zone} in accordance with ${std}, SAES-H-001 (Selection Requirements for Industrial Protective Coatings), and SAES-H-101 (Approved Protective Coating Systems). Inspection scope included surface preparation assessment, DFT measurement, holiday testing, and adhesion verification. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. Dry Film Thickness (DFT) measurements using calibrated ElcoMeter (Type 2 per SSPC-PA 2) indicated readings below the minimum specified system DFT requirement.
+3. Surface preparation cleanliness grade observed to be below the specified minimum per SSPC-SP 10 (Near-White Blast) or SSPC-SP 6 (Commercial Blast) as required by the approved coating system data sheet.
+4. Surface profile (anchor pattern) measurement using Testex Press-O-Film tape per ASTM D4417 Method C - results require verification against coating manufacturer's specification (typically 40-75 microns Rz).
+5. Blotter test per ASTM D4285 to be conducted to confirm absence of oil/moisture contamination in compressed air supply used for blast cleaning.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with SAES-H-001 Section 7 and ${std}, which requires all coating applications to meet the specified surface preparation and DFT requirements before the coating system is accepted. Per SSPC-PA 2, more than 20% of individual DFT measurements falling below the minimum specified DFT constitutes a non-conformance. Inadequate surface preparation and/or DFT directly reduces coating adhesion and barrier protection, resulting in accelerated corrosion, coating delamination, and reduced service life - particularly critical in the corrosive Saudi Arabian environment.`;
+    
+    correctiveActions = `1. IMMEDIATE: Stop coating application in affected area. Mark non-conforming surfaces with NCR tape. Protect blast-cleaned surfaces not yet coated from contamination and re-rusting.
+2. INVESTIGATION: Conduct comprehensive DFT survey per SSPC-PA 2 (minimum 5 gauge readings per 10m2). Perform holiday/continuity test per NACE SP0188 at 67.5V per 25 microns DFT.
+3. REPAIR: Re-blast surface to specified cleanliness per SSPC-SP 10. Apply additional coat(s) of approved material to achieve specified DFT. Feather edges per SSPC-PA 1.
+4. DOCUMENTATION: Submit coating inspection records (surface preparation, DFT, holiday test), material batch certificates, and applicator qualification records to QC Engineer.
+5. PREVENTION: Increase inspection frequency. Mandatory hold points at surface preparation and each coat application stage. Verify applicator qualifications per SAES-H-001.
+6. RE-INSPECTION: Full DFT survey per SSPC-PA 2. Holiday test per NACE SP0188. Pull-off adhesion test per ASTM D4541 - minimum 5 MPa (725 psi).`;
+    
+    verification = `1. DFT survey per SSPC-PA 2 - 100% of readings at or above minimum, no single reading below 80% of minimum specified DFT. Record all measurements.
+2. Holiday/continuity test per NACE SP0188 using wet sponge or high-voltage DC detector at specified voltage (67.5V per 25 microns DFT) - zero holidays acceptable.
+3. Pull-off adhesion test per ASTM D4541 - minimum adhesion 5 MPa (725 psi). Test at 5 locations minimum per SAES-H-001.
+4. Surface cleanliness verification per SSPC VIS-1 - minimum Sa 2.5 (ISO 8501-1) photographically documented.
+5. Company QC Inspector and Coating Inspector (NACE/BGAS certified) sign-off on all inspection records before system acceptance.`;
+
+  } else if (disc.includes('electrical')) {
+    scope = `Inspection of electrical installation works was conducted at ${zone} in accordance with ${std}, SAES-P-100 (Basic Design Criteria for Electrical Systems), IEC 60364, and applicable Saudi Aramco Engineering Standards. Inspection scope included cable installation, termination quality, earthing/grounding continuity, and compliance with hazardous area classification requirements. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. Visual inspection identified deviations from IEC 60364 wiring installation requirements and SAES-P-104 (Wiring Methods and Materials) specifications.
+3. Earthing/grounding system continuity and earth resistance verification required per SAES-P-101 and IEEE 80 - minimum test: earth resistance measurement using fall-of-potential method.
+4. Cable management, bending radius, and termination quality to be assessed against IEC 60228 and cable manufacturer specifications.
+5. Hazardous area (Ex) equipment installation compliance to be verified against API RP 505 area classification drawing and IEC 60079-14 installation requirements.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with ${std} and SAES-P-100, which specifies mandatory requirements for all electrical installations in industrial facilities. The deviation from specified requirements poses risk of electrical fault, arc flash, or ignition of flammable atmosphere in hazardous areas, potentially resulting in fire, explosion, personnel injury, and equipment damage. Per SAES-B-067, all electrical installations in classified areas must be verified as Ex-certified and correctly installed per IEC 60079-14 before energization.`;
+    
+    correctiveActions = `1. IMMEDIATE: De-energize and isolate affected electrical circuits. Prohibit energization until NCR is closed and Company Electrical Engineer provides written clearance.
+2. INVESTIGATION: Conduct complete verification testing per IEC 60364-6 (Initial Verification): insulation resistance (per IEC 60364-6 Table 6A - minimum 1 MΩ), earth continuity, and polarity checks.
+3. REPAIR: Correct installation deficiencies per SAES-P-104 and IEC 60364. Use only approved materials from Saudi Aramco Approved Vendor List (AVL).
+4. DOCUMENTATION: Submit As-Built drawings, cable schedule updates, test records, and Ex equipment installation certificates to Electrical QC Engineer.
+5. PREVENTION: Mandatory hold point inspection at first-fix and second-fix stages. Verify installation contractor's electrical competency certification.
+6. RE-INSPECTION: Full IEC 60364-6 verification test suite. Earth resistance test per IEEE 80 - maximum 1 ohm for main grounding grid. Company Electrical Engineer sign-off required.`;
+    
+    verification = `1. Insulation resistance test per IEC 60364-6 Table 6A - minimum 1 MΩ at 500V DC for low voltage circuits, 1000V DC for 1kV systems.
+2. Earth continuity test - maximum resistance 0.1 ohm from main earth bar to equipment earthing point.
+3. Earth electrode resistance per SAES-P-101 - maximum 1 ohm for main plant grounding grid (measured per IEEE 81 fall-of-potential method).
+4. Loop impedance test per IEC 60364-6 to verify correct operation of overcurrent protective devices.
+5. Company Electrical Engineer and Operations Electrical Representative witness testing and sign completion certificates before energization.`;
+
+  } else if (disc.includes('structural') || disc.includes('steel')) {
+    scope = `Inspection of structural steel erection and connection works was conducted at ${zone} in accordance with ${std}, SAES-M-001 (Structural Design Criteria), AISC 360, and AWS D1.1 (Structural Welding Code - Steel). Inspection scope included member alignment, bolt installation and torque verification, weld quality, and dimensional compliance with approved structural drawings. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. Structural member alignment and plumb/level deviations identified - requires verification against permissible erection tolerances per AISC Code of Standard Practice Section 7.
+3. High-strength bolt installation (ASTM A325/A490) requires verification of bolt grade, washer placement, and installed tension per RCSC Specification Table 8.1 using Turn-of-Nut or Direct Tension Indicator method.
+4. Weld visual inspection per AWS D1.1 Table 6.1 required on all complete joint penetration (CJP) and partial joint penetration (PJP) welds at identified connection.
+5. Base plate bearing and grout installation to be verified per ACI 318 Section 26 and AISC Design Guide 1 requirements.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with ${std} and SAES-M-001, which requires all structural steel connections to meet specified dimensional, bolt pretension, and weld quality requirements before the structure is loaded or construction proceeds to subsequent phases. Inadequate structural connections pose risk of connection failure under design loads (gravity, wind, seismic), potentially resulting in partial or total structural collapse, with severe safety consequences to personnel and adjacent structures.`;
+    
+    correctiveActions = `1. IMMEDIATE: Stop loading of affected structural members. Install temporary shoring if required to maintain stability. Tag with NCR identification.
+2. INVESTIGATION: Complete dimensional survey of affected frame using total station or laser level. Conduct 100% visual weld inspection per AWS D1.1 Table 6.1. Conduct UT on CJP welds per AWS D1.1 Section 6, Part F.
+3. REPAIR: Submit structural repair/rectification scheme prepared by Structural Engineer of Record. Obtain Company approval before commencing repairs. Correct misalignment, re-torque bolts, or repair welds per approved procedure.
+4. DOCUMENTATION: Update As-Built structural drawings. Submit erection survey records, bolt torque records, and weld NDE reports to Structural QC Engineer.
+5. PREVENTION: Implement mandatory QC hold points at column erection, beam connection, and bolt installation stages. Verify surveying instrument calibration.
+6. RE-INSPECTION: Post-repair dimensional survey. 100% NDE on repaired welds. Bolt audit (10% minimum) per RCSC Specification. Structural Engineer of Record sign-off required.`;
+    
+    verification = `1. Dimensional survey of structural frame per AISC Code of Standard Practice Section 7 - plumb tolerance ±1:500 (max 25mm for multi-story).
+2. Bolt pretension verification per RCSC Specification Table 8.1 - ASTM A325 M20 minimum 142 kN, A490 M20 minimum 179 kN (calibrated torque wrench method).
+3. 100% UT examination of CJP welds per AWS D1.1 Section 6, Part F - accept/reject per AWS D1.1 Table 6.3.
+4. Weld visual inspection per AWS D1.1 Table 6.1 - 100% of repaired welds.
+5. Structural Engineer of Record and Company QC Engineer joint sign-off on post-repair survey report and test records.`;
+
+  } else if (disc.includes('mechanical') || disc.includes('pressure vessel') || disc.includes('equipment')) {
+    scope = `Inspection of mechanical equipment installation and testing activities was conducted at ${zone} in accordance with ${std}, SAES-D-001 (Design Criteria for Pressure Vessels), API 510 (Pressure Vessel Inspection Code), and project specifications. Inspection scope included equipment installation, nozzle alignment, flange assembly, and pre-commissioning verification requirements. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. Mechanical equipment installation deviations identified requiring assessment against manufacturer installation manual requirements and ASME standards.
+3. Flange joint assembly requires verification per ASME PCC-1 (Guidelines for Pressure Boundary Bolted Flange Joint Assembly) - bolt sequence, lubrication, and bolt stress requirements.
+4. Equipment alignment (shaft/coupling) requires laser alignment verification per manufacturer tolerances - typically ±0.05mm offset and ±0.05mm/m angularity.
+5. Pre-commissioning checklist items require completion per Saudi Aramco SAES-A-004 before pressure testing authorization.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with ${std} and SAES-D-001, which requires all pressure equipment to meet specified installation and testing requirements before introduction to process fluids or pressurization. The deviation poses risk of equipment failure under operating pressure and temperature, potentially resulting in loss of containment, personnel injury, and process safety incident. Per API 510, all pressure vessels must pass hydrostatic test and inspection before return to or initial service.`;
+    
+    correctiveActions = `1. IMMEDIATE: Place hold on pressurization/commissioning of affected equipment. Do not introduce process fluids until NCR is closed.
+2. INVESTIGATION: Complete pre-commissioning inspection checklist per SAES-A-004. Verify all nozzle loads are within NEMA SM-23/API 610 allowable limits. Check flange face condition per ASME B16.5.
+3. REPAIR: Correct identified deficiencies per manufacturer installation manual and ASME PCC-1. Re-assemble flanged joints per ASME PCC-1 bolt tightening procedure (cross-pattern, 30%-60%-100% torque sequence).
+4. DOCUMENTATION: Submit equipment installation records, alignment report, and pressure test record to Mechanical QC Engineer. Obtain Operations acceptance signature.
+5. PREVENTION: Implement mandatory ITP hold point at equipment setting, alignment, and flange assembly stages. Verify torque wrench calibration certification.
+6. RE-INSPECTION: Hydrostatic test per ASME Section VIII UG-99 at 1.3x MAWP (ASME Div. 1) for minimum 1 hour. Witness by Company Inspector required.`;
+    
+    verification = `1. Hydrostatic pressure test per ASME Section VIII UG-99 at 1.3x MAWP (minimum) for 1 hour - zero leaks, no visible permanent deformation.
+2. Shaft alignment verification using laser alignment tool - offset ≤0.05mm, angularity ≤0.05mm/m at operating temperature.
+3. Flange bolt torque audit per ASME PCC-1 Appendix O - minimum 10% of joints verified with calibrated torque wrench.
+4. Vibration baseline measurement at commissioning per ISO 10816-3 acceptance Zone A/B limits.
+5. Company Mechanical Inspector, Operations Maintenance Representative, and Vendor Representative joint sign-off on pre-commissioning completion certificate.`;
+
+  } else {
+    // General/default
+    scope = `Quality control inspection was conducted at ${zone} as part of ${project} under the ${type} work scope in accordance with ${std} and applicable Saudi Aramco Engineering Standards. Inspection scope covered all work activities within the designated area. Method employed: ${method}.`;
+    
+    observations = `1. ${findings} ${photoRef}
+2. The identified condition requires formal corrective action and QC hold before work proceeds.
+3. Extent of non-conformance to be fully determined through detailed inspection of adjacent/related work.
+4. Related work activities in the affected area to be reviewed for similar non-conformances.
+5. Root cause investigation required to prevent recurrence per ISO 9001 Section 10.2 requirements.`;
+    
+    nonConformance = `The identified condition constitutes a non-conformance with ${std} and the Project Quality Plan requirements. The deviation from specified quality requirements must be addressed through the formal NCR process per ISO 9001 Section 8.7 (Control of Nonconforming Outputs) before work in the affected area may proceed. Failure to address this non-conformance may result in quality defects propagating to subsequent construction phases, increasing the cost and complexity of corrective action.`;
+    
+    correctiveActions = `1. IMMEDIATE: Stop affected work activities. Quarantine non-conforming work with NCR tag. Notify QC Supervisor and Company QC Engineer.
+2. INVESTIGATION: Conduct detailed inspection to determine full extent of non-conformance. Review related work for similar defects.
+3. REPAIR: Prepare and submit corrective action plan to Company QC Engineer for approval before commencing repairs.
+4. DOCUMENTATION: Document all non-conforming work with measurements, photographs, and inspection records. Update quality records.
+5. PREVENTION: Review and update work procedure. Implement additional inspection hold points. Conduct toolbox talk with workforce on quality requirements.
+6. RE-INSPECTION: Independent re-inspection by Company QC Inspector after corrective action. Sign-off required before resuming work.`;
+    
+    verification = `1. Re-inspection of all corrective work by Company QC Inspector - 100% acceptance against ${std} requirements.
+2. All test records, inspection reports, and corrective action documentation filed in NCR package.
+3. Root Cause Analysis (RCA) report submitted to Company QC Engineer within 5 working days.
+4. Updated Inspection Test Plan (ITP) with additional hold points submitted for Company approval.
+5. Company QC Inspector, QC Supervisor, and Project QC Manager sign-off on NCR Corrective Action Report.`;
+  }
+
+  const photoSection = hasPhotos 
+    ? `
+PHOTOGRAPHIC EVIDENCE
+---------------------
+${d.image_urls.length} photograph(s) referenced: ${no}-IMG-001 through ${no}-IMG-00${d.image_urls.length}
+Photographs are embedded in this report and available in the QC Inspector system.
+`
+    : '';
+
+  return `NON-CONFORMANCE INSPECTION REPORT
+=====================================================
+Report No.: ${no}        Date: ${date}
+Project: ${project}
+Discipline: ${type}
+Zone/Location: ${zone}
+Inspector: ${inspector}
+Contractor: ${d.contractor || 'N/A'}
+Standard: ${std}
+Environmental: Temp ${d.temperature || 'N/A'}C | Humidity ${d.humidity || 'N/A'}%
+=====================================================
+
+SEVERITY CLASSIFICATION: ${sev}
+
+1. SCOPE & LOCATION
+-------------------
+${scope}
+
+2. OBSERVATIONS
+---------------
+${observations}
+${photoSection}
+3. NON-CONFORMANCE DESCRIPTION
+-------------------------------
+${nonConformance}
+
+4. CORRECTIVE ACTION REQUIRED
+------------------------------
+${correctiveActions}
+
+5. VERIFICATION REQUIREMENTS
+-----------------------------
+${verification}
+
+6. RESPONSIBLE PARTY & TIMELINE
+---------------------------------
+Responsible Party: ${assigned}
+Severity Classification: ${sev}
+Required Closure: ${timeline}
+Hold Point: Company QC Inspector and QC Supervisor written sign-off required before resuming work in affected area
+NCR Status: OPEN - Corrective Action Pending`;
 }
 
 // ── Fallback report ──────────────────────────────────────────
@@ -335,7 +790,7 @@ function keywordSeverity(text) {
   return 'observation';
 }
 
-// Claude with retry
+// Claude with retry — only called if API key is real
 async function callClaude(messages, maxTokens) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
@@ -350,6 +805,12 @@ async function callClaude(messages, maxTokens) {
   }
 }
 
+// Check if real API key exists
+function hasRealApiKey() {
+  const key = process.env.ANTHROPIC_API_KEY || '';
+  return key.startsWith('sk-ant-') && key.length > 20;
+}
+
 // ── POST /api/reports/generate ──────────────────────────────
 router.post('/generate', async (req, res) => {
   const d = req.body;
@@ -359,14 +820,24 @@ router.post('/generate', async (req, res) => {
   let reportContent;
   let tokensUsed = 0;
 
-  try {
-    const msg = await callClaude([{ role: 'user', content: buildPrompt(d) }], 1500);
-    reportContent = msg.content[0].text;
-    tokensUsed    = msg.usage?.output_tokens || 0;
-    console.log(`[AI] report generated — ${tokensUsed} tokens`);
-  } catch (aiErr) {
-    console.error('[AI] Claude error:', aiErr.message);
-    reportContent = fallbackReport(d);
+  d.image_urls = d.image_urls || [];
+
+  // Use real Claude AI if key exists, otherwise use smartMockReport
+  if (hasRealApiKey()) {
+    try {
+      const msg = await callClaude([{ role: 'user', content: buildPrompt(d) }], 2000);
+      reportContent = msg.content[0].text;
+      tokensUsed    = msg.usage?.output_tokens || 0;
+      console.log(`[AI] Claude report generated — ${tokensUsed} tokens`);
+    } catch (aiErr) {
+      console.error('[AI] Claude error:', aiErr.message);
+      reportContent = smartMockReport(d); // fallback to smart mock
+    }
+  } else {
+    // No API key — use smart discipline-specific mock report
+    console.log('[AI] No API key — using smartMockReport');
+    reportContent = smartMockReport(d);
+    tokensUsed = 0;
   }
 
   if (d.inspection_id) {
@@ -413,11 +884,22 @@ router.post('/suggest-actions', async (req, res) => {
   try {
     const msg = await callClaude([{
       role: 'user',
-      content: `List 5 specific corrective actions for this ${severity || 'major'} ${inspection_type} finding per ${reference_standard || 'ASME B31.3'} / Saudi Aramco standards.
-Finding: "${findings}"
-Respond ONLY with a JSON array (no markdown):
-["Action 1","Action 2","Action 3","Action 4","Action 5"]`,
-    }], 500);
+      content: `You are a Principal QA/QC Engineer with 25+ years experience in Saudi Aramco projects.
+
+For this SPECIFIC ${severity || 'major'} finding in a ${inspection_type} inspection:
+"${findings}"
+
+Applicable standard: ${reference_standard || 'ASME B31.3'}
+
+Write 5 SPECIFIC corrective actions tailored to THIS exact defect type. Each action must:
+- Reference the specific standard clause (e.g., "per ASME B31.3 Para 341.4.1")
+- Include specific acceptance criteria where applicable
+- Be actionable and sequential (containment -> investigation -> repair -> verify)
+- NOT be generic - write for THIS specific observation
+
+Respond ONLY with a valid JSON array of 5 strings (no markdown, no backticks):
+["Action 1 with standard reference","Action 2 with standard reference","Action 3","Action 4","Action 5"]`,
+    }], 600);
     const match = msg.content[0].text.trim().match(/\[[\s\S]*\]/);
     if (!match) throw new Error('no JSON array');
     res.json({ actions: JSON.parse(match[0]) });
