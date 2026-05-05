@@ -1242,57 +1242,71 @@ function buildPDF(doc, insp, imageBuffers) {
      .text(findingsText, MARGIN, y, { width: W - MARGIN * 2, lineGap: 3 });
   y = doc.y + 12;
 
-  // ── AI REPORT SECTIONS ────────────────────────────────────
+  // ── AI / SMART REPORT SECTIONS ──────────────────────────
   if (insp.ai_report) {
-    const sections = parseReportSections(insp.ai_report);
+    const reportText = cleanText(insp.ai_report);
+    const headers = [];
 
-    if (sections) {
-      sections.forEach(section => {
-        // Check if we need a new page
-        if (y > H - 120) {
-          doc.addPage();
-          y = MARGIN;
-        }
+    // Find section headers: "1. TITLE" followed by dashes
+    const lines = reportText.split('\n');
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      const hm = line.match(/^([0-9]+)[.]\s+([A-Z][A-Z\s&\/]+)$/);
+      if (hm) {
+        // next line might be dashes - skip it
+        const nextLine = (lines[i+1] || '').trim();
+        const afterDash = nextLine.match(/^[-=]+$/) ? i + 2 : i + 1;
+        headers.push({ num: hm[1], title: hm[2].trim(), contentStart: afterDash, lineIndex: i });
+      }
+      i++;
+    }
 
-        if (section.title && section.title !== 'NCR REPORT') {
-          y = sectionBar(y, section.num ? `${section.num}. ${section.title}` : section.title, C.navy) + 6;
-        }
+    if (headers.length === 0) {
+      // No sections — render as paragraphs
+      if (y > H - 80) { doc.addPage(); y = MARGIN; }
+      doc.fillColor(C.gray).font('Helvetica').fontSize(9)
+         .text(reportText, MARGIN, y, { width: W - MARGIN * 2, lineGap: 3 });
+      y = doc.y + 8;
+    } else {
+      headers.forEach(function(hdr, hi) {
+        const nextHdrLine = hi + 1 < headers.length ? headers[hi + 1].lineIndex : lines.length;
+        const sectionLines = lines.slice(hdr.contentStart, nextHdrLine);
 
-        if (section.content) {
-          const content = cleanText(section.content);
+        if (y > H - 100) { doc.addPage(); y = MARGIN; }
+        y = sectionBar(y, hdr.num + '. ' + hdr.title, C.navy) + 8;
 
-          // Check if content has numbered list
-          if (/^\d+\.\s/.test(content)) {
-            const lines = content.split('\n').filter(l => l.trim());
-            lines.forEach(line => {
-              const isItem = /^\d+\.\s/.test(line.trim());
-              if (y > H - 80) { doc.addPage(); y = MARGIN; }
+        sectionLines.forEach(function(line) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.match(/^[-=]+$/)) { return; }
+          if (y > H - 60) { doc.addPage(); y = MARGIN; }
 
-              if (isItem) {
-                // Bullet point styling
-                doc.circle(MARGIN + 5, y + 4, 2).fill(C.blue);
-                doc.fillColor(C.gray).font('Helvetica').fontSize(9)
-                   .text(line.replace(/^[0-9]+\.\s*/, '').trim(), MARGIN + 14, y,
-                         { width: W - MARGIN * 2 - 14, lineGap: 2 });
-              } else {
-                doc.fillColor(C.gray).font('Helvetica').fontSize(9)
-                   .text(line, MARGIN, y, { width: W - MARGIN * 2, lineGap: 2 });
-              }
-              y = doc.y + 4;
-            });
+          const numMatch = trimmed.match(/^([0-9]+)[.]\s+(.+)$/);
+          if (numMatch) {
+            const label = numMatch[2];
+            const colonIdx = label.indexOf(':');
+            doc.circle(MARGIN + 5, y + 5, 2.5).fill(C.blue);
+            if (colonIdx > 0 && colonIdx < 25) {
+              doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(8.5)
+                 .text(label.slice(0, colonIdx) + ': ', MARGIN + 14, y, { continued: true, width: W - MARGIN * 2 - 14 });
+              doc.fillColor(C.gray).font('Helvetica').fontSize(8.5)
+                 .text(label.slice(colonIdx + 1).trim(), { width: W - MARGIN * 2 - 14, lineGap: 2 });
+            } else {
+              doc.fillColor(C.gray).font('Helvetica').fontSize(9)
+                 .text(label, MARGIN + 14, y, { width: W - MARGIN * 2 - 14, lineGap: 2 });
+            }
           } else {
             doc.fillColor(C.gray).font('Helvetica').fontSize(9)
-               .text(content, MARGIN, y, { width: W - MARGIN * 2, lineGap: 3 });
-            y = doc.y + 8;
+               .text(trimmed, MARGIN, y, { width: W - MARGIN * 2, lineGap: 3 });
           }
-        }
-
-        y += 4;
+          y = doc.y + 5;
+        });
+        y += 6;
       });
     }
   }
 
-  // ── CORRECTIVE ACTION (from form) ───────────────────────
+    // ── CORRECTIVE ACTION (from form) ───────────────────────
   if (insp.corrective_action && !insp.ai_report) {
     if (y > H - 80) { doc.addPage(); y = MARGIN; }
     y = sectionBar(y, '4. CORRECTIVE ACTION REQUIRED', C.navy) + 8;
