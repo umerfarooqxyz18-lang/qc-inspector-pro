@@ -1012,7 +1012,7 @@ router.get('/pdf/:inspection_id', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'no-store');
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true, autoFirstPage: true });
+    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: false, autoFirstPage: true });
     doc.pipe(res);
     buildPDF(doc, insp, imageBuffers);
     doc.end();
@@ -1264,7 +1264,7 @@ function buildPDF(doc, insp, imageBuffers) {
 
     if (headers.length === 0) {
       // No sections — render as paragraphs
-      if (y > H - 80) { doc.addPage(); y = MARGIN; }
+      if (y > H - 80) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
       doc.fillColor(C.gray).font('Helvetica').fontSize(9)
          .text(reportText, MARGIN, y, { width: W - MARGIN * 2, lineGap: 3 });
       y = doc.y + 8;
@@ -1273,13 +1273,13 @@ function buildPDF(doc, insp, imageBuffers) {
         const nextHdrLine = hi + 1 < headers.length ? headers[hi + 1].lineIndex : lines.length;
         const sectionLines = lines.slice(hdr.contentStart, nextHdrLine);
 
-        if (y > H - 100) { doc.addPage(); y = MARGIN; }
+        if (y > H - 100) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
         y = sectionBar(y, hdr.num + '. ' + hdr.title, C.navy) + 8;
 
         sectionLines.forEach(function(line) {
           const trimmed = line.trim();
           if (!trimmed || trimmed.match(/^[-=]+$/)) { return; }
-          if (y > H - 60) { doc.addPage(); y = MARGIN; }
+          if (y > H - 60) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
 
           const numMatch = trimmed.match(/^([0-9]+)[.]\s+(.+)$/);
           if (numMatch) {
@@ -1308,11 +1308,11 @@ function buildPDF(doc, insp, imageBuffers) {
 
     // ── CORRECTIVE ACTION (from form) ───────────────────────
   if (insp.corrective_action && !insp.ai_report) {
-    if (y > H - 80) { doc.addPage(); y = MARGIN; }
+    if (y > H - 80) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
     y = sectionBar(y, '4. CORRECTIVE ACTION REQUIRED', C.navy) + 8;
     const caLines = insp.corrective_action.split("\n").filter(function(l){ return l.trim(); });
     caLines.forEach((line, i) => {
-      if (y > H - 60) { doc.addPage(); y = MARGIN; }
+      if (y > H - 60) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
       doc.circle(MARGIN + 5, y + 4, 2).fill(C.blue);
       doc.fillColor(C.gray).font('Helvetica').fontSize(9)
          .text(line.replace(/^[0-9]+\.\s*/, '').trim(), MARGIN + 14, y,
@@ -1324,7 +1324,7 @@ function buildPDF(doc, insp, imageBuffers) {
 
   // ── VERIFICATION REQUIREMENTS (from form) ────────────────
   if (insp.verification_requirements && !insp.ai_report) {
-    if (y > H - 80) { doc.addPage(); y = MARGIN; }
+    if (y > H - 80) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
     y = sectionBar(y, '5. VERIFICATION REQUIREMENTS', C.navy) + 8;
     doc.fillColor(C.gray).font('Helvetica').fontSize(9)
        .text(cleanText(insp.verification_requirements), MARGIN, y,
@@ -1338,7 +1338,7 @@ function buildPDF(doc, insp, imageBuffers) {
 
   if (hasImages || hasImageUrls) {
     // Add new page only if not enough room
-    if (y > H - 200) { doc.addPage(); y = MARGIN; }
+    if (y > H - 200) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
     else { y += 12; }
 
     y = sectionBar(y, 'PHOTO EVIDENCE', C.navy) + 12;
@@ -1421,7 +1421,7 @@ function buildPDF(doc, insp, imageBuffers) {
   }
 
   // ── SIGN-OFF BOX ─────────────────────────────────────────
-  if (y > H - 100) { doc.addPage(); y = MARGIN; }
+  if (y > H - 100) { drawFooter(doc, company, reportNo, C, H, MARGIN); doc.addPage(); y = MARGIN; }
   y += 8;
 
   doc.rect(MARGIN, y, W - MARGIN * 2, 70).fill(C.light).stroke(C.border);
@@ -1448,25 +1448,19 @@ function buildPDF(doc, insp, imageBuffers) {
        .text('Signature / Date', sx, sigY + 34, { width: 140 });
   });
 
-  // ── PAGE NUMBERS & FOOTER ─────────────────────────────────
-  // Flush all pages then add footers
-  const range      = doc.bufferedPageRange();
-  const totalPages = range.count;
+  // ── FOOTER on current (last) page ───────────────────────
+  drawFooter(doc, company, reportNo, C, H, MARGIN);
+}
 
-  for (let i = 0; i < totalPages; i++) {
-    doc.switchToPage(i);
-    // Footer bar
-    doc.rect(0, H - 28, W, 28).fill('#0a1f5c');
-    doc.fillColor('rgba(255,255,255,0.6)').font('Helvetica').fontSize(7)
-       .text(
-         `${company}  |  Report: ${reportNo}  |  CONFIDENTIAL — For authorized personnel only`,
-         MARGIN, H - 18,
-         { align: 'left', width: W - MARGIN * 2 - 60 }
-       );
-    doc.fillColor(C.gold).font('Helvetica-Bold').fontSize(8)
-       .text(`${i + 1} / ${totalPages}`, 0, H - 18,
-             { align: 'right', width: W - MARGIN / 2 });
-  }
+// Draw footer on current page
+function drawFooter(doc, company, reportNo, C, H, MARGIN) {
+  doc.rect(0, H - 28, doc.page.width, 28).fill('#0a1f5c');
+  doc.fillColor('rgba(255,255,255,0.6)').font('Helvetica').fontSize(7)
+     .text(
+       company + '  |  Report: ' + reportNo + '  |  CONFIDENTIAL — For authorized personnel only',
+       MARGIN, H - 18,
+       { align: 'left', width: doc.page.width - MARGIN * 2 - 40 }
+     );
 }
 
 module.exports = router;
